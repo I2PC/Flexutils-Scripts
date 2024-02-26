@@ -1,0 +1,10 @@
+include LICENSE
+include requirement/*.yml
+include icon_square.png
+include scripts/*.py
+include socket/*.py
+include viewers/*.py
+include *.sh
+include *.rst
+include *.txt
+include *.py
