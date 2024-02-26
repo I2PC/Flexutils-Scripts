@@ -40,28 +40,28 @@ SCRIPT_PATH=$(realpath "${BASH_SOURCE[0]}")
 SCRIPT_DIR=$(dirname "SCRIPT_PATH")
 
 # Get package version
-VERSION=$(PYTHONPATH="$SCRIPT_DIR/" python -c "from flexutils_script import __version__; print(__version__)")
+#VERSION=$(PYTHONPATH="$SCRIPT_DIR/" python -c "from flexutils_script import __version__; print(__version__)")
 
 # Check flexutils environment is installed and remove it in case a new version is available
-PREV_ENV_NAME=$(conda env list | grep "$search_word" | awk '{print $1}')
-PREV_VERSION="${env_name##*-}"
+PREV_ENV_NAME=$(conda env list | grep "flexutils" | awk '{print $1}')
+#PREV_VERSION="${env_name##*-}"
 
-if [ "PREV_VERSION" != "$VERSION" ] && [ ! -z "PREV_ENV_NAME" ]; then
+#if [ "PREV_VERSION" != "$VERSION" ] && [ ! -z "PREV_ENV_NAME" ]; then
+if [ ! -z "PREV_ENV_NAME" ]; then
     echo "Found Flexutils environment(s)"
     conda env remove -n $PREV_ENV_NAME
 fi
 
 # Source the conda.sh script
-CONDA_PATH=$(which conda)
-CONDA_PATH=$(realpath "CONDA_PATH")
-CONDA_SH="${CONDA_PATH%/bin/conda}/etc/profile.d/conda.sh"
+CONDA_PATH=$(conda info --base)
+CONDA_SH="$CONDA_PATH/etc/profile.d/conda.sh"
 source "$CONDA_SH"
 
 # Install new flexutils environment
-conda env create flexutils-$VERSION -f $SCRIPT_DIR/requirements/flexutils_env.yml
+conda env create -f $SCRIPT_DIR/requirements/flexutils_env.yml
 
 # Install current package in Flexutils env
-conda activate flexutils-$VERSION
+conda activate flexutils
 pip install -e $SCRIPT_DIR
 
 # Setup Tensorflow
