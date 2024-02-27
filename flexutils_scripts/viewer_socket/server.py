@@ -81,7 +81,7 @@ class Server:
         while True:
             try:
                 raw_msglen = self.recMsg(4)
-                # data = self.client_socket.recv(4096, socket.MSG_DONTWAIT | socket.MSG_PEEK)
+                # data = self.client_socket.recv(4096, socket.MSG_DONTWAIT | viewer_socket.MSG_PEEK)
                 if raw_msglen:
                     self.generateMap(raw_msglen)
             except ConnectionResetError:

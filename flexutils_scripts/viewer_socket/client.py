@@ -26,7 +26,7 @@
 # **************************************************************************
 
 
-from flexutils_scripts import socket
+import socket
 import pickle
 import struct
 

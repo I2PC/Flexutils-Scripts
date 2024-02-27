@@ -72,8 +72,8 @@ from napari.utils import progress
 from magicgui.widgets import ComboBox, Container, Slider, Button
 
 from flexutils_scripts.viewers.viewer_morph_chimerax import FlexMorphChimeraX
-from flexutils_scripts.socket.pyqt_socket_threads import ServerQThread, ClientQThread
-from flexutils_scripts.socket.server import Server
+from flexutils_scripts.viewer_socket.pyqt_socket_threads import ServerQThread, ClientQThread
+from flexutils_scripts.viewer_socket.server import Server
 from flexutils_scripts import getImagePath, getProgram
 
 
