@@ -31,7 +31,7 @@ from xmipp_metadata.image_handler import ImageHandler
 
 from PyQt5.QtCore import QThread, pyqtSignal
 
-from client import Client
+from flexutils_scripts.socket.client import Client
 
 from flexutils_scripts import getProgram, runProgram
 
