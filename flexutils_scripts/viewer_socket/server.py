@@ -29,7 +29,6 @@
 import os
 import numpy as np
 import socket
-from flexutils_scripts import utils as utl
 from contextlib import closing
 import pickle
 import types
@@ -94,6 +93,7 @@ class Server:
 
     def prepareMapGeneration(self):
         if self.mode == "Zernike3D":
+            from flexutils_scripts import utils as utl
             from xmipp_metadata.image_handler import ImageHandler
             mask = ImageHandler(self.metadata["mask"]).getData()
             volume = ImageHandler(self.metadata["volume"]).getData()
