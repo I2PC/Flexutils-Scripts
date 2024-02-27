@@ -246,3 +246,11 @@ def main():
         metadata = pickle.load(fp)
 
     server = Server(args.mode, metadata, port=args.port)
+
+
+if __name__ == '__main__':
+    import re
+    import sys
+    sys.argv[0] = re.sub(r'(-script\.pyw|\.exe)?$', '', sys.argv[0])
+    sys.exit(main())
+
