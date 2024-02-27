@@ -7,3 +7,6 @@ toolkit/*.egg-info
 
 # IDE files
 .idea
+
+# Flexutils plugin files
+flexutils_installed
