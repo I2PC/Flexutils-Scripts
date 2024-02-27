@@ -28,6 +28,8 @@
 import os
 import sys
 import subprocess
+import pkg_resources
+from importlib import import_module
 
 
 __version__ = "1.0.0"
@@ -59,11 +61,34 @@ def getProgram(program, env_name=None):
 
     if env_name != "flexutils":
         # We need to call the script with python
-        which_command = f"{getCondaActivationCommand()} && conda activate flexutils && which {program}"
-        program_path = subprocess.check_output(which_command, shell=True, text=True).strip()
+        program_path = findEntryPointPath(program)
         program = "python " + program_path
 
     return f"{getCondaActivationCommand()} && conda activate {env_name} && {program}"
+
+def findEntryPointPath(entry_point_name):
+    entry_point = None
+
+    # Attempt to find the entry point
+    for ep in pkg_resources.iter_entry_points(group='console_scripts'):
+        if ep.name == entry_point_name:
+            entry_point = ep
+            break
+
+    if entry_point is not None:
+        # Extract module (and function, if any)
+        module_name = entry_point.module_name
+        attrs = entry_point.attrs
+
+        # Import the module/package
+        module = import_module(module_name)
+
+        # Resolve the module/package to its file path
+        file_path = os.path.abspath(module.__file__)
+
+        return file_path
+    else:
+        raise FileNotFoundError(f"Script {entry_point_name} not found")
 
 def runProgram(program, args, env=None, cwd=None):
     command = program + " " + args
