@@ -121,7 +121,7 @@ def reassignReference(md_file, maski, maskr, file_z_clnm_r, prevL1, prevL2, L1, 
     metadata_out.write(os.path.join(dir, "inputParticles_reassigned.xmd"), overwrite=True)
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

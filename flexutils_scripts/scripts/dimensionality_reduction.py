@@ -56,7 +56,7 @@ def reduceDimensions(coords_ld, outFile, mode, **kwargs):
     np.savetxt(outFile, coords)
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

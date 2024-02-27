@@ -63,7 +63,7 @@ def computeZernikeDeformation(file_input, file_z_clnm, file_output):
     np.savetxt(file_output, deformation)
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

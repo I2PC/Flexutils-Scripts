@@ -230,7 +230,7 @@ class Server:
         self.server_socket.close()
 
 
-if __name__ == "__main__":
+def main():
     import argparse
 
     # Input parameters

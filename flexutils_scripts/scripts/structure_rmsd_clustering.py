@@ -123,7 +123,7 @@ def structureRMSDClustering(z_space, pdb_file, box_size, sr, dist_thr, L1, L2, o
 
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

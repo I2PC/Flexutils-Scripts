@@ -85,7 +85,7 @@ def readZernike3DFile(path, num_vol):
     return np.asarray(z_clnm_vw[num_vol:])
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

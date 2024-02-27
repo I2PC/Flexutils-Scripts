@@ -53,7 +53,7 @@ def createPolygons(coords, sampling, outFile):
         pickle.dump(polygons, f)
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

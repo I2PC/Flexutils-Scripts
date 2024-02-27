@@ -101,7 +101,7 @@ def computeZernikeCoefficientsStructure(file_input, file_target, file_output, L1
     utl.writeZernikeFile(z_clnm_file, z_clnm, L1, L2, r)
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

@@ -61,7 +61,7 @@ def computeLandscapeZScores(landscape_file, outPath, fast, neighbours=10):
     np.savetxt(os.path.join(outPath, "z_scores.txt"), z_scores)
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

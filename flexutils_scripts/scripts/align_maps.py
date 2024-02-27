@@ -35,7 +35,7 @@ def alignMaps(file_input, file_target, file_output, global_search=None):
                               output_map=file_output)
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

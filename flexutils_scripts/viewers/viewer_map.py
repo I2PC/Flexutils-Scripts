@@ -480,7 +480,7 @@ def summers(z_space, L1, L2, coords, r, processes):
 # ---------------------------------------------------------------------------
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

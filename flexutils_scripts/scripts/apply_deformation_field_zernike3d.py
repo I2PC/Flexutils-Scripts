@@ -106,7 +106,7 @@ def apply_deformation_field_zernike3d(ref_file, vol_file, z_file, out_file, boxs
         pd.writePDB(out_file, pd_struct_out, hybrid36=True)
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

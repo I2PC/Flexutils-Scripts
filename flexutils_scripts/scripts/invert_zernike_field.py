@@ -72,7 +72,7 @@ def invertZernikeField(file_input, file_reference, file_z_clnm, file_output):
                          basis_params[2])
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

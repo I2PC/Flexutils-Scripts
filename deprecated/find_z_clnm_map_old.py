@@ -241,7 +241,7 @@
 #     xmipp3.Plugin.runXmippProgram('xmipp_volume_apply_coefficient_zernike3d', params)
 #
 #
-# if __name__ == '__main__':
+# def main():
 #     import argparse
 #
 #     # Input parameters

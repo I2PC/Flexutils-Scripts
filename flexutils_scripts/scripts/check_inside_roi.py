@@ -49,7 +49,7 @@ def checkInROI(coords, polygons_file, outFile):
     np.savetxt(outFile, np.asarray(in_area_vec))
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

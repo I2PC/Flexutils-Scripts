@@ -157,7 +157,7 @@ def analyzeRS(field_file, indices_file, out_path, boxsize):
         mrc.set_data(LR.astype(np.float32))
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

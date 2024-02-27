@@ -94,7 +94,7 @@ def fieldToBinaryZernike3d(md_file, mask_reg, mask_bin, boxsize, L1, L2, thr):
     md.write(md_file, overwrite=True)
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

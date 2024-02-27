@@ -104,7 +104,7 @@ def computeZernikeCoefficientsMap(file_input, file_target, file_output, L1, L2):
                                       ImageHandler(file_input).getSamplingRate())
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

@@ -41,7 +41,7 @@ def floodFillMask(infile, outfile):
     ImageHandler().write(data, outfile)
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

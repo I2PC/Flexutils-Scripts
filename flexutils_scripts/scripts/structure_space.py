@@ -233,7 +233,7 @@ def getReducedSpace(z_space_file, structure_file, out_path, sampling_rate, bxsiz
     np.savetxt(os.path.join(out_path, "red_coords.txt"), coords)
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters

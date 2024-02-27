@@ -102,7 +102,7 @@ def maskDeformationField(md_file, maski, maskdf, prevL1, prevL2, L1, L2, Rmax, t
     metadata_out.write(os.path.join(dir, "inputParticles_focused.xmd"), overwrite=True)
 
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     # Input parameters
