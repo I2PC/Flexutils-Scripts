@@ -31,8 +31,6 @@ from matplotlib.widgets import Slider, Button
 import seaborn as sns
 import pandas as pd
 
-from pyworkflow import Config
-
 sns.set_theme()
 
 
@@ -68,7 +66,7 @@ class InteractiveHist(object):
         axcreateSubset = plt.axes([0.75, 0.02, 0.2, 0.050])
         # Button does not allow to define text color so
         # I write it directly
-        color = Config.SCIPION_MAIN_COLOR if hasattr(Config, "SCIPION_MAIN_COLOR") else "maroon"
+        color = "maroon"
         axcreateSubset.text(0.5, 0.5, 'Subset Particles',
                             verticalalignment='center',
                             horizontalalignment='center',

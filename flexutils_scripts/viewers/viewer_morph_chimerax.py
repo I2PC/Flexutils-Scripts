@@ -32,8 +32,6 @@ from sklearn.neighbors import KDTree
 
 from PyQt5.QtCore import QObject, pyqtSignal
 
-from pwem.viewers import Chimera
-
 from flexutils_scripts.viewers.viewer_salesman_solver import salesmanSolver
 
 
@@ -141,4 +139,4 @@ class FlexMorphChimeraX(QObject):
         chimera_home = os.environ.get("CHIMERA_HOME")
         program = os.path.join(chimera_home, 'bin', os.path.basename("ChimeraX"))
         cmd = program + ' "%s"' % scriptFile
-        Popen(cmd, shell=True, env=Chimera.getEnviron(), cwd=os.getcwd())
+        Popen(cmd, shell=True, cwd=os.getcwd())

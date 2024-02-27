@@ -38,10 +38,7 @@ from skimage.morphology import ball, convex_hull_image, skeletonize
 from subprocess import call
 from xmipp_metadata.image_handler import ImageHandler
 
-import pyworkflow.utils as pwutils
-
-from pwem.convert.transformations import superimposition_matrix
-from pwem.viewers import Chimera
+from flexutils_scripts.transformations import superimposition_matrix
 
 from flexutils_scripts.scripts.apply_deformation_field_zernike3d import apply_deformation_field_zernike3d
 #####################################
@@ -738,7 +735,7 @@ def computeRMSD(coords_1, coords_2):
 
 ############## Functions to handle maps ##############
 def readMap(file):
-    if pwutils.getExt(file) == ".mrc":
+    if os.path.splitext(file)[1] == ".mrc":
         file += ":mrc"
     return ImageHandler().read(file).getData()
 
@@ -866,7 +863,7 @@ def alignMapsChimeraX(map_file_1, map_file_2, global_search=None, output_map=Non
     chimera_home = os.environ.get("CHIMERA_HOME")
     program = os.path.join(chimera_home, 'bin', os.path.basename("ChimeraX"))
     cmd = program + ' --nogui "%s"' % scriptFile
-    call(cmd, shell=True, env=Chimera.getEnviron(), cwd=os.getcwd())
+    call(cmd, shell=True, cwd=os.getcwd())
 
     with open('transformation.positions') as f:
         line = f.readline()
