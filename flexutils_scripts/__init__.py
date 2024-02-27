@@ -48,7 +48,7 @@ def getCondaBase():
         return None
 
 def getCondaActivationCommand():
-    return f"$({getCondaBase()}/bin/conda shell.bash hook)"
+    return f'eval "$({getCondaBase()}/bin/conda shell.bash hook)"'
 
 def getCondaSourceFile():
     conda_source_file = f"{getCondaBase()}/etc/profile.d/conda.sh"
