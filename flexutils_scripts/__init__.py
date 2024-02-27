@@ -56,6 +56,13 @@ def getCondaSourceFile():
 
 def getProgram(program, env_name=None):
     env_name = env_name if env_name is not None else "flexutils"
+
+    if env_name != "flexutils":
+        # We need to call the script with python
+        which_command = f"{getCondaActivationCommand()} && conda activate flexutils && which {program}"
+        program_path = subprocess.check_output(which_command, shell=True, text=True).strip()
+        program = "python " + program_path
+
     return f"{getCondaActivationCommand()} && conda activate {env_name} && {program}"
 
 def runProgram(program, args, env=None, cwd=None):
