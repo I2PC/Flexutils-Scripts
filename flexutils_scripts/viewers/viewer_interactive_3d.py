@@ -34,7 +34,6 @@ from umap.parametric_umap import load_ParametricUMAP
 import os
 import shutil
 from glob import glob
-import psutil
 import tensorflow as tf
 
 from xmipp_metadata.image_handler import ImageHandler
@@ -506,8 +505,7 @@ class Annotate3D(object):
     # ---------------------------------------------------------------------------
     def on_close_callback(self):
         # If viewer is closed, remove socket
-        self.server.process.terminate()
-        self.server.process.wait()
+        self.server.stop()
 
     def lassoSelector(self, viewer, event):
         # viewer = self.view

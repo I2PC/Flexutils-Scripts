@@ -27,6 +27,7 @@
 
 import os
 import shutil
+import signal
 from xmipp_metadata.image_handler import ImageHandler
 
 from PyQt5.QtCore import QThread, pyqtSignal
@@ -49,6 +50,9 @@ class ServerQThread(QThread):
     def run(self):
         args = f"--metadata_file {self.metadata_file} --mode {self.mode} --port {self.port}"
         self.process = runProgram(self.program, args, popen=True)
+
+    def stop(self):
+        os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
 
 class ClientQThread(QThread):
     finished = pyqtSignal()

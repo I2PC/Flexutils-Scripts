@@ -99,7 +99,7 @@ def runProgram(program, args, env=None, cwd=None, popen=False):
     command = program + " " + args
     if popen:
         return subprocess.Popen(command, shell=True, stdout=sys.stdout, stderr=sys.stderr,
-                                env=env, cwd=cwd)
+                                env=env, cwd=cwd, preexec_fn=os.setsid)
     else:
         return subprocess.check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr,
                                      env=env, cwd=cwd)
