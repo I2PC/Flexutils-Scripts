@@ -53,7 +53,7 @@ def getCondaSourceFile():
 
 def getProgram(program, env_name=None):
     env_name = env_name if env_name is not None else "flexutils"
-    return f"source {getCondaSourceFile()} && conda activate {env_name} && python {program}"
+    return f"source {getCondaSourceFile()} && conda activate {env_name} && {program}"
 
 def runProgram(program, args, env=None, cwd=None):
     command = program + " " + args

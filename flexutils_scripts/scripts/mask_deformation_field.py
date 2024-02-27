@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # **************************************************************************
 # *
 # * Authors:  David Herreros Calero (dherreros@cnb.csic.es)

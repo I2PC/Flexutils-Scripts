@@ -4,6 +4,7 @@ include icon_square.png
 include scripts/*.py
 include socket/*.py
 include viewers/*.py
+include deprecated/*.py
 include *.sh
 include *.rst
 include *.txt
