@@ -95,7 +95,11 @@ def findEntryPointPath(entry_point_name):
     else:
         raise FileNotFoundError(f"Script {entry_point_name} not found")
 
-def runProgram(program, args, env=None, cwd=None):
+def runProgram(program, args, env=None, cwd=None, popen=False):
     command = program + " " + args
-    subprocess.check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr,
-                          env=env, cwd=cwd)
+    if popen:
+        return subprocess.Popen(command, shell=True, stdout=sys.stdout, stderr=sys.stderr,
+                                env=env, cwd=cwd)
+    else:
+        return subprocess.check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr,
+                                     env=env, cwd=cwd)

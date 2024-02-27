@@ -506,10 +506,8 @@ class Annotate3D(object):
     # ---------------------------------------------------------------------------
     def on_close_callback(self):
         # If viewer is closed, remove socket
-        for proc in psutil.process_iter():
-            cmdline = " ".join(proc.cmdline())
-            if "--port {:d}".format(self.port) in cmdline and "server.py" in cmdline:
-                proc.kill()
+        self.server.process.terminate()
+        self.server.process.wait()
 
     def lassoSelector(self, viewer, event):
         # viewer = self.view

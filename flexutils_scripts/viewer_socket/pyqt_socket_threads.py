@@ -44,10 +44,11 @@ class ServerQThread(QThread):
         self.mode = mode
         self.port = port
         self.env = env
+        self.process = None
 
     def run(self):
         args = f"--metadata_file {self.metadata_file} --mode {self.mode} --port {self.port}"
-        runProgram(self.program, args)
+        self.process = runProgram(self.program, args, popen=True)
 
 class ClientQThread(QThread):
     finished = pyqtSignal()
