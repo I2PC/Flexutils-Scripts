@@ -28,7 +28,8 @@
 
 import os
 import numpy as np
-from flexutils_scripts import socket, utils as utl
+import socket
+from flexutils_scripts import utils as utl
 from contextlib import closing
 import pickle
 import types
