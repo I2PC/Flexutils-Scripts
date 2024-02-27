@@ -43,7 +43,7 @@ SCRIPT_DIR=$(dirname "SCRIPT_PATH")
 #VERSION=$(PYTHONPATH="$SCRIPT_DIR/" python -c "from flexutils_script import __version__; print(__version__)")
 
 # Check flexutils environment is installed and remove it in case a new version is available
-PREV_ENV_NAME=$(conda env list | grep "flexutils" | awk '{print $1}')
+PREV_ENV_NAME=$(conda info --envs | grep 'flexutils' | grep -v 'tensorflow' | awk '{print $1}')
 #PREV_VERSION="${env_name##*-}"
 
 #if [ "PREV_VERSION" != "$VERSION" ] && [ ! -z "PREV_ENV_NAME" ]; then
@@ -66,8 +66,8 @@ pip install -e $SCRIPT_DIR
 
 # Setup Tensorflow
 mkdir -p $CONDA_PREFIX/etc/conda/activate.d
-echo \'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib/\\n\' >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
-echo \'export XLA_FLAGS=--xla_gpu_cuda_data_dir=$CONDA_PREFIX/lib/\\n\' >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
+echo export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib/ >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
+echo export XLA_FLAGS=--xla_gpu_cuda_data_dir=$CONDA_PREFIX/lib/ >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
 mkdir -p $CONDA_PREFIX/lib/nvvm/libdevice
 cp $CONDA_PREFIX/lib/libdevice.10.bc $CONDA_PREFIX/lib/nvvm/libdevice/
 
