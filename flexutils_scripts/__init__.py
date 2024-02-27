@@ -56,7 +56,7 @@ def getCondaSourceFile():
     conda_source_file = f"{getCondaBase()}/etc/profile.d/conda.sh"
     return conda_source_file
 
-def getProgram(program, env_name=None):
+def getProgram(program, env_name=None, variables=None):
     env_name = env_name if env_name is not None else "flexutils"
 
     if env_name != "flexutils":
@@ -64,7 +64,12 @@ def getProgram(program, env_name=None):
         program_path = findEntryPointPath(program)
         program = "python " + program_path
 
-    return f"{getCondaActivationCommand()} && conda activate {env_name} && {program}"
+    if variables is None:
+        variables = ""
+    else:
+        variables = ' '.join(f"{key}={value}" for key, value in variables.items())
+
+    return f"{getCondaActivationCommand()} && conda activate {env_name} && {variables} {program}"
 
 def findEntryPointPath(entry_point_name):
     entry_point = None

@@ -329,7 +329,8 @@ class Annotate3D(object):
             self.thread_chimerax = None
 
             # Volume generation socket
-            program = getProgram("server.py", env_name=self.class_inputs["env_name"])
+            program = getProgram("server.py", env_name=self.class_inputs["env_name"],
+                                 variables={"CHIMERA_HOME": os.environ["CHIMERA_HOME"]})
             if self.mode == "Zernike3D":
                 metadata = {"mask": os.path.join(self.path, "mask_reference_original.mrc"),
                             "volume": os.path.join(self.path, "reference_original.mrc"),
