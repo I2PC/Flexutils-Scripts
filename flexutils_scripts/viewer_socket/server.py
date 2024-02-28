@@ -180,7 +180,7 @@ class Server:
         z = pickle.loads(z)
 
         if self.mode == "Zernike3D":
-            import flexutils.protocols.xmipp.utils.utils as utl
+            from flexutils_scripts import utils as utl
             from xmipp_metadata.image_handler import ImageHandler
             from scipy.ndimage import gaussian_filter
             for zz in z:

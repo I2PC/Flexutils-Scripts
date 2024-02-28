@@ -197,6 +197,7 @@ class Annotate3D(object):
         self.last_selected = set()
         self.current_axis = [0, 1, 2]
         boxsize = 128
+        env_name = kwargs.get("env_name", None)
 
         # Keyboard attributes
         self.control_pressed = False
@@ -328,7 +329,7 @@ class Annotate3D(object):
             self.thread_chimerax = None
 
             # Volume generation socket
-            program = getProgram("server.py", env_name=self.class_inputs["env_name"],
+            program = getProgram("server.py", env_name=env_name,
                                  variables={"CHIMERA_HOME": os.environ["CHIMERA_HOME"]})
             if self.mode == "Zernike3D":
                 metadata = {"mask": os.path.join(self.path, "mask_reference_original.mrc"),
