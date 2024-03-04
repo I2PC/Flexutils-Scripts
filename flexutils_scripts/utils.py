@@ -39,8 +39,6 @@ from subprocess import call
 from xmipp_metadata.image_handler import ImageHandler
 
 from flexutils_scripts.transformations import superimposition_matrix
-
-from flexutils_scripts.scripts.apply_deformation_field_zernike3d import apply_deformation_field_zernike3d
 #####################################
 
 
@@ -674,6 +672,7 @@ def reassociateCoefficients(Z, Zpp, Ap, A=None):
     return np.transpose(computeInverse(Zpp.T @ Zpp) @ Zpp.T @ Z @ (A.T - Ap.T))
 
 def applyDeformationField(map, mask, output, path, z_clnm, L1, L2, Rmax):
+    from flexutils_scripts.scripts.apply_deformation_field_zernike3d import apply_deformation_field_zernike3d
     mask_file = os.path.join(path, mask)
     file_input = os.path.join(path, map)
     z_file = os.path.join(path, "z_clnm.txt")
