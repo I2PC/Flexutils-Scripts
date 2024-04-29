@@ -44,3 +44,4 @@ dependencies:
     - pathos
     - python_tsp==0.3.1
     - tensorflow==2.11.0
+    - open3d-cpu

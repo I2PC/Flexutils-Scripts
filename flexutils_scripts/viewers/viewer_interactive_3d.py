@@ -35,6 +35,7 @@ import os
 import shutil
 from glob import glob
 import tensorflow as tf
+# import open3d as o3d
 
 from xmipp_metadata.image_handler import ImageHandler
 from matplotlib.pyplot import get_cmap
@@ -152,9 +153,10 @@ class MenuWidget(QWidget):
 class MultipleViewerWidget(QSplitter):
     """The main widget of the example."""
 
-    def __init__(self, viewer: napari.Viewer, ndims, interactive):
+    def __init__(self, viewer: napari.Viewer, npoints, ndims, interactive):
         super().__init__()
         self.viewer = viewer
+        percentage = min(int(100 * 10000 / npoints), 100)
 
         if interactive:
             self.viewer_model1 = ViewerModel(title="map_view", ndisplay=3)
@@ -172,6 +174,7 @@ class MultipleViewerWidget(QSplitter):
             self.right_widgets.append(ComboBox(choices=[], label="# layer"))
             self.right_widgets.append(Button(label="Add selection to # layer"))
             self.right_widgets.append(Slider(value=100, min=1, max=300, label="Landscape-Vol-Labels #"))
+            self.right_widgets.append(Slider(value=percentage, min=0, max=100, label="Landscape downsampling"))
             self.select_axis_container = Container(widgets=self.right_widgets)
             w1 = QtLayerControlsContainer(self.viewer_model1)
             self.tab_widget.addTab(w1, "Map view")
@@ -214,7 +217,8 @@ class Annotate3D(object):
         # Create viewer
         self.view = napari.Viewer(ndisplay=3, title="Flexutils 3D Annotation")
         self.view.window._qt_window.setWindowIcon(QIcon(getImagePath(("icon_square.png"))))
-        self.dock_widget = MultipleViewerWidget(self.view, self.data.shape[1], interactive=interactive)
+        self.dock_widget = MultipleViewerWidget(self.view, self.data.shape[0], self.data.shape[1],
+                                                interactive=interactive)
 
         # Load in view or interactive mode
         self.view.window.qt_viewer.dockLayerControls.setVisible(interactive)
@@ -241,12 +245,16 @@ class Annotate3D(object):
         # Scale data to box of side 300
         self.data = (boxsize - 1) * (self.data - np.amin(self.data)) / (np.amax(self.data) - np.amin(self.data))
 
+        # Downsample PC
+        self.doing_dowsampling = False
+        data, self.data_indices = downsample_point_cloud(self.data, 10000)
+
         # Create KDTree
         self.kdtree_data = KDTree(self.data[:, :3])
         self.kdtree_z_pace = KDTree(self.z_space)
 
         # Set data in viewers
-        points_layer = self.dock_widget.viewer.add_points(np.copy(self.data[:, :3]), size=1, shading='spherical',
+        points_layer = self.dock_widget.viewer.add_points(np.copy(data[:, :3]), size=1, shading='spherical',
                                                           edge_width=0,
                                                           antialiasing=0,
                                                           blending="additive", name="Landscape")
@@ -320,6 +328,7 @@ class Annotate3D(object):
             self.dock_widget.right_widgets[1].changed.connect(lambda event: self.selectAxis(1, event))
             self.dock_widget.right_widgets[2].changed.connect(lambda event: self.selectAxis(2, event))
             self.dock_widget.right_widgets[3].changed.connect(self.updateVolSigma)
+            self.dock_widget.right_widgets[8].changed.connect(self.updateDownsampling)
             self.dock_widget.right_widgets[5].choices = self.getLayerChoices
             self.dock_widget.right_widgets[4].changed.connect(self.extractSelectionToLayer)
             self.dock_widget.right_widgets[6].changed.connect(self.addSelectionToLayer)
@@ -630,7 +639,7 @@ class Annotate3D(object):
         self.alt_pressed = False
 
     def _compute_kmeans_fired(self):
-        landscape = self.dock_widget.viewer.layers["Landscape"].data
+        landscape = self.data[:, self.current_axis]
         n_clusters = int(self.dock_widget.menu_widget.cluster_num.text())
         self.kmeans_data = []
         self.z_center = []
@@ -684,7 +693,7 @@ class Annotate3D(object):
                                                face_color=color, metadata={"needs_closest": False, "save": True})
 
     def _compute_dim_cluster_fired(self):
-        landscape = self.dock_widget.viewer.layers["Landscape"].data
+        landscape = self.data[:, self.current_axis]
         axis = int(self.dock_widget.menu_widget.dimension_sel.currentText().replace("Dim ", "")) - 1
         n_clusters = int(self.dock_widget.menu_widget.cluster_num.text())
         self.kmeans_data = []
@@ -888,6 +897,16 @@ class Annotate3D(object):
         layer.data = vol
         layer.refresh()
 
+    def updateDownsampling(self, percentage):
+        self.doing_dowsampling = True
+        num_samples = int(0.01 * percentage * self.data.shape[0])
+        data, self.data_indices = downsample_point_cloud(self.data, num_samples)
+        # self.kdtree_data = KDTree(data[:, self.current_axis])
+        self.dock_widget.viewer.layers["Landscape"].data = data
+        self.dock_widget.viewer.layers["Landscape"].selected_data = set()
+        self.dock_widget.viewer.layers["Landscape"].refresh()
+        self.doing_dowsampling = False
+
     def updateVolLabels(self, num_labels):
         # Landscape data
         data = self.dock_widget.viewer.layers["Landscape"].data
@@ -937,7 +956,7 @@ class Annotate3D(object):
     # Update map functions
     # ---------------------------------------------------------------------------
     def updateConformation(self, event):
-        if event.type != "highlight":
+        if event.type != "highlight" and not self.doing_dowsampling:
             # Update real time conformation
             pos = event.value
             layer_idx = event.index
@@ -1044,6 +1063,14 @@ def rotation_matrix_from_vectors(vec1, vec2):
     kmat = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
     rotation_matrix = np.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s ** 2))
     return rotation_matrix
+
+def downsample_point_cloud(points, num_samples):
+    indices = np.random.choice(np.arange(points.shape[0], dtype=int), num_samples, replace=False)
+    return points[indices], indices
+    # o3d_pc = o3d.geometry.PointCloud()
+    # o3d_pc.points = o3d.utility.Vector3dVector(points)
+    # down_pc = o3d_pc.farthest_point_down_sample(num_samples=num_samples)
+    # return np.asarray(down_pc.points)
 
 def main():
     import argparse
