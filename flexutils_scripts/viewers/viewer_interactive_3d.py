@@ -731,22 +731,9 @@ class Annotate3D(object):
             # Store the mean and the points
             group_means[i, axis] = means_pca1[i]
 
-        # group_means = np.vstack(group_means)
         self.interp_val = labels.astype(int)
 
-        # Compute clusters along dimension and save automatic selection
-        # sort_ind = np.argsort(landscape[..., axis])
-        # sort_ind_split = np.array_split(sort_ind, n_clusters)
-        # centers = np.vstack([np.mean(landscape[ind], axis=0) for ind in sort_ind_split])
-        # labels = np.empty_like(sort_ind)
-        # for idx in range(len(sort_ind_split)):
-        #     labels[sort_ind_split[idx]] = idx
-        # self.interp_val = labels
-
         # Cluster always along PCA space
-        # _, inds = self.kdtree_data.query(group_means, k=1)
-        # inds = np.array(inds).flatten()
-        # selected_data = np.copy(landscape[inds])
         z_tr_data = self.transformer.inverse_transform(group_means)
         self.z_center = np.copy(z_tr_data)
 
