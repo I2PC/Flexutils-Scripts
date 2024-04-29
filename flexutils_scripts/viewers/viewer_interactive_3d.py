@@ -469,37 +469,53 @@ class Annotate3D(object):
                     layer.save(os.path.join(pathFile, layer.name))
                     points = layer.data
 
-                    if "save" in layer.metadata:
-                        metadata = layer.metadata
-                        if metadata["save"]:
-                            # if metadata["needs_closest"]:
-                            _, inds = self.kdtree_data.query(points, k=1)
-                            inds = np.array(inds).flatten()
-                            z_space_points = self.z_space[inds]
-                            if not metadata["needs_closest"]:
-                                mean = np.mean(z_space_points, axis=0)[None, ...]
-                                selected_z.append(np.concatenate([mean, z_space_points], axis=0))
-                                names.append(name + "_cluster")
+                    if len(points) > 0:
+                        if "save" in layer.metadata:
+                            metadata = layer.metadata
+                            if metadata["save"]:
+                                # if metadata["needs_closest"]:
+                                _, inds = self.kdtree_data.query(points, k=1)
+                                inds = np.array(inds).flatten()
+                                z_space_points = self.z_space[inds]
+                                if not metadata["needs_closest"]:
+                                    if "Cluster_" in layer.name:
+                                        cluster_id = int(layer.name.split("_")[-1])
+                                        mean = self.z_center[cluster_id][None, ...]
+                                    else:
+                                        mean = np.mean(z_space_points, axis=0)[None, ...]
+                                    selected_z.append(np.concatenate([mean, z_space_points], axis=0))
+                                    names.append(name + "_cluster")
+                            else:
+                                save = False
+                        elif "cluster_ids_in_space" in layer.name:
+                            labels = layer.data
+                            unique_labels = np.unique(labels)[2:]
+                            for label in unique_labels:
+                                points = np.asarray(np.where(labels == label)).T
+                                _, inds = self.kdtree_data.query(points, k=1)
+                                inds = np.array(inds).flatten()
+                                selected_z.append(self.z_space[inds])
+                                names.append(name + f"_cluster_l{label}")
                         else:
-                            save = False
-                    elif "cluster_ids_in_space" in layer.name:
-                        labels = layer.data
-                        unique_labels = np.unique(labels)[2:]
-                        for label in unique_labels:
-                            points = np.asarray(np.where(labels == label)).T
                             _, inds = self.kdtree_data.query(points, k=1)
                             inds = np.array(inds).flatten()
                             selected_z.append(self.z_space[inds])
-                            names.append(name + f"_cluster_l{label}")
+                            names.append(name)
                     else:
-                        _, inds = self.kdtree_data.query(points, k=1)
-                        inds = np.array(inds).flatten()
-                        selected_z.append(self.z_space[inds])
-                        names.append(name)
+                        if not layer.metadata["needs_closest"]:
+                            names.append(name + "_cluster")
+                        if "Cluster_" in layer.name:
+                            cluster_id = int(layer.name.split("_")[-1])
+                            selected_z.append(self.z_center[cluster_id][None, ...])
+                        else:
+                            selected_z.append(self.z_space.max() * np.ones([1, self.z_space.shape[1]]) + 10.0)
+                        save = layer.metadata["save"] if "save" in layer.metadata else save
+
 
                     if save:
-                        for z, n in zip(selected_z, names):
-                            np.savetxt(os.path.join(self.path, f'saved_selections_{n}.txt'), z, delimiter=" ")
+                        # for z, n in zip(selected_z, names):
+                        np.savetxt(os.path.join(self.path, f'saved_selections_{names[-1]}.txt'), selected_z[-1],
+                                   delimiter=" ")
 
     # ---------------------------------------------------------------------------
     # Callbacks
@@ -617,6 +633,7 @@ class Annotate3D(object):
         landscape = self.dock_widget.viewer.layers["Landscape"].data
         n_clusters = int(self.dock_widget.menu_widget.cluster_num.text())
         self.kmeans_data = []
+        self.z_center = []
         self.clusters_data = []
 
         # Remove previous clusters and kmeans
@@ -628,6 +645,7 @@ class Annotate3D(object):
         # Compute KMeans and save automatic selection
         clusters = MiniBatchKMeans(n_clusters=n_clusters).fit(self.z_space)
         centers = clusters.cluster_centers_
+        self.z_center = np.copy(centers)
         self.interp_val = clusters.labels_
         _, inds = self.kdtree_z_pace.query(centers, k=1)
         inds = np.array(inds).flatten()
@@ -670,6 +688,7 @@ class Annotate3D(object):
         axis = int(self.dock_widget.menu_widget.dimension_sel.currentText().replace("Dim ", "")) - 1
         n_clusters = int(self.dock_widget.menu_widget.cluster_num.text())
         self.kmeans_data = []
+        self.z_center = []
         self.clusters_data = []
 
         # Remove previous clusters and kmeans
@@ -682,12 +701,11 @@ class Annotate3D(object):
         pca_axis = self.transformer_data[..., axis]
         min_pca1, max_pca1 = pca_axis.min(), pca_axis.max()
         intervals = np.linspace(min_pca1, max_pca1, n_clusters + 1)
+        means_pca1 = 0.5 * (intervals[:-1] + intervals[1:])
 
         # Initialize lists to hold group means and point indices
-        group_means = []
-        # group_points = []
+        group_means = np.zeros((n_clusters, self.data.shape[-1]))
         labels = np.empty_like(pca_axis)
-
         # Compute clusters along dimension and save automatic selection
         for i in range(n_clusters):
             # Find points that fall within the current interval
@@ -701,15 +719,10 @@ class Annotate3D(object):
                 # Assign labels
                 labels[in_interval] = i
 
-                # Compute mean for points in the interval along PCA1
-                mean_pca = np.zeros(self.data.shape[-1])
-                mean_pca[axis] = points_in_group.mean()
+            # Store the mean and the points
+            group_means[i, axis] = means_pca1[i]
 
-                # Store the mean and the points
-                group_means.append(mean_pca)
-                # group_points.append(points_in_group)
-
-        group_means = np.vstack(group_means)
+        # group_means = np.vstack(group_means)
         self.interp_val = labels.astype(int)
 
         # Compute clusters along dimension and save automatic selection
@@ -726,7 +739,7 @@ class Annotate3D(object):
         # inds = np.array(inds).flatten()
         # selected_data = np.copy(landscape[inds])
         z_tr_data = self.transformer.inverse_transform(group_means)
-        self.kmeans_data.append(np.copy(z_tr_data))
+        self.z_center = np.copy(z_tr_data)
 
         # Features
         features = {
@@ -752,9 +765,13 @@ class Annotate3D(object):
         self.dock_widget.viewer.layers["Landscape"].visible = False
         cm = get_cmap("viridis")
         color_ids = np.linspace(0.0, 1.0, n_clusters)
-        for label, color_id in zip(np.unique(self.interp_val), color_ids):
-            self.kmeans_data.append(np.copy(self.data[self.interp_val == label]))
-            cluster_points = np.copy(landscape[self.interp_val == label])
+        # for label, color_id in zip(np.unique(self.interp_val), color_ids):
+        for label, color_id in zip(range(n_clusters), color_ids):
+            if label in self.interp_val:
+                self.kmeans_data.append(np.copy(self.data[self.interp_val == label]))
+                cluster_points = np.copy(landscape[self.interp_val == label])
+            else:
+                cluster_points = None
             color = np.asarray(cm(color_id))
             self.dock_widget.viewer.add_points(cluster_points, size=1, name=f"Cluster_{label}", visible=False,
                                                shading='spherical', edge_width=0, antialiasing=0,
@@ -772,8 +789,9 @@ class Annotate3D(object):
                     inds = np.array(inds).flatten()
                     sel_names = ["vol_%03d" % (idx + 1) for idx in range(points.shape[0])]
                     z_space = self.z_space[inds]
-                    if "along PCA" in layer.name:
-                        z_space = self.transformer.inverse_transform(self.transformer.transform(z_space))
+                    if "along PCA" in layer.name or "KMeans" in layer.name:
+                        # z_space = self.transformer.inverse_transform(self.transformer.transform(z_space))
+                        z_space = self.z_center
                     if z_space.ndim == 1:
                         z_space = z_space[None, ...]
 
