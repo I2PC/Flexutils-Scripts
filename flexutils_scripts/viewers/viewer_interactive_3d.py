@@ -156,7 +156,8 @@ class MultipleViewerWidget(QSplitter):
     def __init__(self, viewer: napari.Viewer, npoints, ndims, interactive):
         super().__init__()
         self.viewer = viewer
-        percentage = min(int(100 * 10000 / npoints), 100)
+        num_samples = 10000 if npoints > 10000 else npoints
+        percentage = min(int(100 * num_samples / npoints), 100)
 
         if interactive:
             self.viewer_model1 = ViewerModel(title="map_view", ndisplay=3)
@@ -247,7 +248,8 @@ class Annotate3D(object):
 
         # Downsample PC
         self.doing_dowsampling = False
-        data, self.data_indices = downsample_point_cloud(self.data, 10000)
+        num_samples = 10000 if self.data.shape[0] > 10000 else self.data.shape[0]
+        data, self.data_indices = downsample_point_cloud(self.data, num_samples)
 
         # Create KDTree
         self.kdtree_data = KDTree(self.data[:, :3])
