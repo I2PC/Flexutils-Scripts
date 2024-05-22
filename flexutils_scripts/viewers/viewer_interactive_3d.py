@@ -342,6 +342,7 @@ class Annotate3D(object):
             # Volume generation socket
             program = getProgram("server.py", env_name=env_name,
                                  variables={"CHIMERA_HOME": os.environ["CHIMERA_HOME"]})
+            metadata = None
             if self.mode == "Zernike3D":
                 metadata = {"mask": os.path.join(self.path, "mask_reference_original.mrc"),
                             "volume": os.path.join(self.path, "reference_original.mrc"),
@@ -360,19 +361,20 @@ class Annotate3D(object):
                 metadata = {"weights": self.class_inputs["weights"],
                             "config": self.class_inputs["config"], "outdir": self.path}
 
-            metadata_file = os.path.join(self.path, "metadata.p")
-            with open(metadata_file, 'wb') as fp:
-                pickle.dump(metadata, fp, protocol=pickle.HIGHEST_PROTOCOL)
+            if metadata is not None:
+                metadata_file = os.path.join(self.path, "metadata.p")
+                with open(metadata_file, 'wb') as fp:
+                    pickle.dump(metadata, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
-            # Start server
-            self.port = Server.getFreePort()
-            self.server = ServerQThread(program, metadata_file, self.mode, self.port, None)
-            self.server.start()
+                # Start server
+                self.port = Server.getFreePort()
+                self.server = ServerQThread(program, metadata_file, self.mode, self.port, None)
+                self.server.start()
 
-            # Start client
-            self.client = ClientQThread(self.port, self.path, self.mode)
-            self.client.volume.connect(self.updateEmittedMap)
-            self.client.chimera.connect(self.launchChimeraX)
+                # Start client
+                self.client = ClientQThread(self.port, self.path, self.mode)
+                self.client.volume.connect(self.updateEmittedMap)
+                self.client.chimera.connect(self.launchChimeraX)
 
         # Run viewer
         self.app = QApplication.instance()
