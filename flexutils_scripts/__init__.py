@@ -69,7 +69,12 @@ def getProgram(program, env_name=None, variables=None):
     else:
         variables = ' '.join(f"{key}={value}" for key, value in variables.items())
 
-    return f"{getCondaActivationCommand()} && conda activate {env_name} && {variables} {program}"
+    if env_name == "scipion3":
+        program = f"{variables} {os.environ['SCIPION_HOME']} run {program}"
+    else:
+        program = f"{getCondaActivationCommand()} && conda activate {env_name} && {variables} {program}"
+
+    return program
 
 def findEntryPointPath(entry_point_name):
     entry_point = None

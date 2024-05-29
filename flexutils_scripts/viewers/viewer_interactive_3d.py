@@ -340,8 +340,16 @@ class Annotate3D(object):
             self.thread_chimerax = None
 
             # Volume generation socket
+            if "useGPU" in self.class_inputs.keys():
+                if isinstance(self.class_inputs["useGPU"], str):
+                    useGPU = [int(gpuId) for gpuId in self.class_inputs["useGPU"].split(",")][0]
+                elif isinstance(self.class_inputs["useGPU"], float):
+                    useGPU = int(self.class_inputs["useGPU"])
+            else:
+                useGPU = ""
             program = getProgram("server.py", env_name=env_name,
-                                 variables={"CHIMERA_HOME": os.environ["CHIMERA_HOME"]})
+                                 variables={"CHIMERA_HOME": os.environ["CHIMERA_HOME"],
+                                            "CUDA_VISIBLE_DEVICES": str(useGPU)})
             metadata = None
             if self.mode == "Zernike3D":
                 metadata = {"mask": os.path.join(self.path, "mask_reference_original.mrc"),
@@ -356,10 +364,18 @@ class Annotate3D(object):
                             "architecture": self.class_inputs["architecture"],
                             "outdir": self.path}
             elif self.mode == "CryoDrgn":
-                import cryodrgn
-                cryodrgn.Plugin._defineVariables()
                 metadata = {"weights": self.class_inputs["weights"],
-                            "config": self.class_inputs["config"], "outdir": self.path}
+                            "config": self.class_inputs["config"], "outdir": self.path,
+                            "boxsize": self.class_inputs["boxsize"],
+                            "apix": self.class_inputs["sr"]}
+            elif self.mode == "3DFlex":
+                useGPU = 0 if useGPU == "" else useGPU
+                metadata = {"projectId": self.class_inputs["projectId"],
+                            "workSpaceId": self.class_inputs["workSpaceId"],
+                            "trainJobId": self.class_inputs["trainJobId"],
+                            "projectPath": self.class_inputs["projectPath"],
+                            "csGPU": useGPU,
+                            "outdir": self.path}
 
             if metadata is not None:
                 metadata_file = os.path.join(self.path, "metadata.p")
@@ -747,7 +763,7 @@ class Annotate3D(object):
         }
 
         # Text labels
-        translation = np.zeros((1, group_means.shape[1]))
+        translation = np.zeros((1, 3))
         translation[-1] += -3
         text = {
             'string': 'Cluster {id:d}',
