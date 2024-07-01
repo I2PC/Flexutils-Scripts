@@ -112,6 +112,7 @@ class Server:
                 groups, centers = None, None
             self.Z = utl.computeBasis(L1=int(self.metadata["L1"]), L2=int(self.metadata["L2"]),
                                       pos=coords, r=0.5 * self.metadata["boxSize"], groups=groups, centers=centers)
+
         elif self.mode == "CryoDrgn":
             import torch
             from cryodrgn.models import HetOnlyVAE
@@ -144,6 +145,7 @@ class Server:
             self.norm = [float(x) for x in cfg["dataset_args"]["norm"]]
             self.model, self.lattice = HetOnlyVAE.load(cfg, self.metadata["weights"], device=device)
             self.model.eval()
+
         elif self.mode == "HetSIREN":
             import h5py
             from pathlib import Path
@@ -162,6 +164,7 @@ class Server:
 
             # Load model
             self.autoencoder = AutoEncoder(generator, het_dim=self.metadata["lat_dim"],
+                                           poseReg=self.metadata["pose_reg"], ctfReg=self.metadata["ctf_reg"],
                                            architecture=self.metadata["architecture"])
             if generator.mode == "spa":
                 self.autoencoder.build(input_shape=(None, generator.xsize, generator.xsize, 1))

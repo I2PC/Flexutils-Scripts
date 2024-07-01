@@ -362,6 +362,8 @@ class Annotate3D(object):
                 metadata = {"weights": self.class_inputs["weights"],
                             "lat_dim": self.z_space.shape[1],
                             "architecture": self.class_inputs["architecture"],
+                            "pose_reg": self.class_inputs["pose_reg"],
+                            "ctf_reg": self.class_inputs["ctf_reg"],
                             "outdir": self.path}
             elif self.mode == "CryoDrgn":
                 metadata = {"weights": self.class_inputs["weights"],
