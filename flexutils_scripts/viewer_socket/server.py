@@ -172,6 +172,10 @@ class Server:
                 self.autoencoder.build(input_shape=[(None, generator.xsize, generator.xsize, 1),
                                                     [None, generator.sinusoid_table.shape[1]]])
             self.autoencoder.load_weights(self.metadata["weights"])
+            elif generator.mode == "tomo":
+                self.autoencoder.build(input_shape=[(None, generator.xsize, generator.xsize, 1),
+                                                    [None, generator.sinusoid_table.shape[1]]])
+            self.autoencoder.load_weights(self.metadata["weights"])
 
         elif self.mode == "NMA":
             pass

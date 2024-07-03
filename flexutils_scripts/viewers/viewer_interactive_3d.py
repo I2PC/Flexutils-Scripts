@@ -68,6 +68,7 @@ from napari._qt.layer_controls import QtLayerControlsContainer
 from napari._qt.utils import _maybe_allow_interrupt
 from napari.utils.notifications import show_warning, notification_manager
 from napari.utils import progress
+from napari.layers import Points
 
 from magicgui.widgets import ComboBox, Container, Slider, Button
 
@@ -79,6 +80,39 @@ from flexutils_scripts import getImagePath, getProgram
 
 NAPARI_GE_4_16 = parse_version(napari.__version__) > parse_version("0.4.16")
 
+
+class CustomPointsLayer(napari.layers.Points):
+    def __init__(self, data=None, *args, **kwargs):
+        super().__init__(data, *args, **kwargs)
+        self._fixed_name = kwargs.get("name")  # Store the initial name
+
+    @property
+    def name(self):
+        return self._fixed_name
+
+    @name.setter
+    def name(self, value):
+        # Prevent renaming by ignoring any attempts to change the name
+        pass
+
+    def add(self, event):
+        # Override add to prevent adding new points
+        pass
+
+    def drag(self, event):
+        # Override drag to prevent adding new points
+        pass
+
+    def remove_selected(self):
+        # Allow deletion of points
+        super().remove_selected()
+
+    def save(self, path):
+        points_layer = Points(data=self.data)
+        points_layer.metadata = self.metadata
+        for key, value in self.properties.items():
+            points_layer.properties[key] = value
+        points_layer.save(path)
 
 class PCA_UMAP:
     '''Auxiliar class to align an UMAP cloud along its principal components'''
@@ -163,6 +197,7 @@ class MultipleViewerWidget(QSplitter):
             self.viewer_model1 = ViewerModel(title="map_view", ndisplay=3)
 
             self.qt_viewer1 = QtViewerWrap(self.viewer_model1, self.viewer_model1)
+            self.qt_viewer1.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Maximum)
 
             self.tab_widget = QTabWidget()
             self.menu_widget = MenuWidget(ndims)
@@ -180,7 +215,8 @@ class MultipleViewerWidget(QSplitter):
             w1 = QtLayerControlsContainer(self.viewer_model1)
             self.tab_widget.addTab(w1, "Map view")
             self.tab_widget.addTab(self.menu_widget, "Menu")
-            self.tab_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
+            # self.tab_widget.setMaximumWidth(500)
+            self.tab_widget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Maximum)
 
             self.viewer.window.add_dock_widget(self.tab_widget, area="bottom")
             self.viewer.window.add_dock_widget(self.qt_viewer1, area="bottom")
@@ -206,6 +242,10 @@ class Annotate3D(object):
         # Keyboard attributes
         self.control_pressed = False
         self.alt_pressed = False
+
+        # Attributes to control callback flow
+        self.allow_removing_cluster_layer = True
+        self.allow_modifying_kmeans_layer = True
 
         # Scale data to box of side 300
         # bounding = np.amax(np.abs(np.amax(data, axis=0) - np.amin(data, axis=0)))
@@ -326,6 +366,7 @@ class Annotate3D(object):
             self.dock_widget.menu_widget.dimension_btn.clicked.connect(self._compute_dim_cluster_fired)
             self.dock_widget.menu_widget.morph_button.clicked.connect(self._morph_chimerax_fired)
             self.dock_widget.viewer.layers.events.inserted.connect(self.on_insert_add_callback)
+            self.dock_widget.viewer.layers.events.removed.connect(self.on_removing_layer)
             self.dock_widget.right_widgets[0].changed.connect(lambda event: self.selectAxis(0, event))
             self.dock_widget.right_widgets[1].changed.connect(lambda event: self.selectAxis(1, event))
             self.dock_widget.right_widgets[2].changed.connect(lambda event: self.selectAxis(2, event))
@@ -423,8 +464,10 @@ class Annotate3D(object):
             idc = 0
             cluster_colors = [colors.rgb2hex(viridis(value)) for value in values]
 
+            # Cluster centers
+            self.z_center = []
+
             for file in glob(os.path.join(pathFile, "*")):
-                print(file)
                 if "Cluster" in file:
                     metadata = {"needs_closest": False, "save": True}
                     text, features = None, None
@@ -432,6 +475,9 @@ class Annotate3D(object):
                     face_color = cluster_colors[idc]
                     extra_args = {"text": text, "size": size, "face_color": face_color, "features": features,
                                   "shading": 'spherical', "edge_width": 0, "antialiasing": 0, "visible": False}
+                    cluster_name = os.path.splitext(os.path.basename(file))[0]
+                    selections_file = os.path.join(self.path, f'saved_selections_{cluster_name}_cluster.txt')
+                    self.z_center.append(np.loadtxt(selections_file)[0])
                     idc += 1
                 elif "KMeans" in file:
                     metadata = {"needs_closest": False, "save": False}
@@ -464,11 +510,25 @@ class Annotate3D(object):
                 elif ".csv" in file:
                     self.dock_widget.viewer.open(file, layer_type="points", metadata=metadata, **extra_args)
 
+                    if "Cluster" in file or "KMeans" in file:
+                        layer = self.dock_widget.viewer.layers[-1]
+                        custom_layer = CustomPointsLayer(data=layer.data, name=layer.name, **extra_args)
+                        custom_layer.metadata = layer.metadata
+                        self.dock_widget.viewer.layers.remove(layer)
+                        self.dock_widget.viewer.add_layer(custom_layer)
+
+            if len(self.z_center) > 0:
+                self.z_center = np.asarray(self.z_center)
+
         # Add callbacks
         for layer in self.dock_widget.viewer.layers:
             if "Landscape-Vol" not in layer.name and len(layer.data.shape) == 2:
                 layer.events.data.connect(self.updateConformation)
                 layer.events.highlight.connect(self.updateConformation)
+
+            if "KMeans" in layer.name:
+                self.current_kmeans_data = np.copy(layer.data)
+                layer.events.data.connect(self.on_kmeans_layer_data_removal)
 
     def readMap(self, file):
         map = ImageHandler().read(file).getData()
@@ -484,6 +544,10 @@ class Annotate3D(object):
 
     def saveSelections(self):
         pathFile = os.path.join(self.path, "selections_layers")
+        selectionFiles = os.path.join(self.path, "saved_selections_*.txt")
+
+        for match in glob(selectionFiles):
+            os.remove(match)
 
         if os.path.isdir(pathFile):
             shutil.rmtree(pathFile)
@@ -510,7 +574,7 @@ class Annotate3D(object):
                                 z_space_points = self.z_space[inds]
                                 if not metadata["needs_closest"]:
                                     if "Cluster_" in layer.name:
-                                        cluster_id = int(layer.name.split("_")[-1])
+                                        cluster_id = int(layer.name.split("_")[-1]) - 1
                                         mean = self.z_center[cluster_id][None, ...]
                                     else:
                                         mean = np.mean(z_space_points, axis=0)[None, ...]
@@ -536,7 +600,7 @@ class Annotate3D(object):
                         if not layer.metadata["needs_closest"]:
                             names.append(name + "_cluster")
                         if "Cluster_" in layer.name:
-                            cluster_id = int(layer.name.split("_")[-1])
+                            cluster_id = int(layer.name.split("_")[-1]) - 1
                             selected_z.append(self.z_center[cluster_id][None, ...])
                         else:
                             selected_z.append(self.z_space.max() * np.ones([1, self.z_space.shape[1]]) + 10.0)
@@ -668,10 +732,14 @@ class Annotate3D(object):
         self.clusters_data = []
 
         # Remove previous clusters and kmeans
+        self.allow_removing_cluster_layer = False
+        self.allow_modifying_kmeans_layer = False
         layer_names = [layer.name for layer in self.dock_widget.viewer.layers]
         for layer_name in layer_names:
             if "Cluster_" in layer_name or "KMeans" in layer_name:
                 self.dock_widget.viewer.layers.remove(layer_name)
+        self.allow_removing_cluster_layer = True
+        self.allow_modifying_kmeans_layer = True
 
         # Compute KMeans and save automatic selection
         clusters = MiniBatchKMeans(n_clusters=n_clusters).fit(self.z_space)
@@ -698,9 +766,12 @@ class Annotate3D(object):
             'translation': translation,
         }
 
-        self.dock_widget.viewer.add_points(selected_data, size=2, name="KMeans", metadata={"needs_closest": False,
+        kmeans_layer = CustomPointsLayer(selected_data, size=2, name="KMeans", metadata={"needs_closest": False,
                                                                                            "save": False},
-                                           features=features, text=text, face_color="#5500ff")
+                                         features=features, text=text, face_color="#5500ff")
+        self.dock_widget.viewer.add_layer(kmeans_layer)
+        kmeans_layer.events.data.connect(self.on_kmeans_layer_data_removal)
+        self.current_kmeans_data = np.copy(selected_data)
 
         # Add points for each cluster independently with colors
         self.dock_widget.viewer.layers["Landscape"].visible = False
@@ -710,9 +781,10 @@ class Annotate3D(object):
             self.kmeans_data.append(np.copy(self.data[self.interp_val == label]))
             cluster_points = np.copy(landscape[self.interp_val == label])
             color = np.asarray(cm(color_id))
-            self.dock_widget.viewer.add_points(cluster_points, size=1, name=f"Cluster_{label}", visible=False,
-                                               shading='spherical', edge_width=0, antialiasing=0,
-                                               face_color=color, metadata={"needs_closest": False, "save": True})
+            cluster_layer = CustomPointsLayer(cluster_points, size=1, name=f"Cluster_{label + 1}", visible=False,
+                                              shading='spherical', edge_width=0, antialiasing=0,
+                                              face_color=color, metadata={"needs_closest": False, "save": True})
+            self.dock_widget.viewer.add_layer(cluster_layer)
 
     def _compute_dim_cluster_fired(self):
         landscape = self.data[:, self.current_axis]
@@ -723,10 +795,14 @@ class Annotate3D(object):
         self.clusters_data = []
 
         # Remove previous clusters and kmeans
+        self.allow_removing_cluster_layer = False
+        self.allow_modifying_kmeans_layer = False
         layer_names = [layer.name for layer in self.dock_widget.viewer.layers]
         for layer_name in layer_names:
             if "Cluster_" in layer_name or "KMeans" in layer_name:
                 self.dock_widget.viewer.layers.remove(layer_name)
+        self.allow_modifying_kmeans_layer = True
+        self.allow_removing_cluster_layer = True
 
         # Determine the range of PCA DIM and divide into X equal intervals
         pca_axis = self.transformer_data[..., axis]
@@ -769,15 +845,18 @@ class Annotate3D(object):
         translation[-1] += -3
         text = {
             'string': 'Cluster {id:d}',
-            'size': 5,
+            'size': 10,
             'color': 'white',
             'translation': translation,
         }
 
         group_means = 127 * (group_means - np.amin(self.transformer_data)) / (np.amax(self.transformer_data) - np.amin(self.transformer_data))
-        self.dock_widget.viewer.add_points(group_means[..., self.current_axis], size=2, name="KMeans along PCA {:d}".format(axis + 1),
-                                           metadata={"needs_closest": False, "save": False}, features=features, text=text,
-                                           face_color="#5500ff")
+        kmeans_layer = CustomPointsLayer(group_means[..., self.current_axis], size=2, name="KMeans along PCA {:d}".format(axis + 1),
+                                         metadata={"needs_closest": False, "save": False}, features=features, text=text,
+                                         face_color="#5500ff")
+        self.dock_widget.viewer.add_layer(kmeans_layer)
+        kmeans_layer.events.data.connect(self.on_kmeans_layer_data_removal)
+        self.current_kmeans_data = np.copy(group_means[..., self.current_axis])
 
         # Add points for each cluster independently with colors
         self.dock_widget.viewer.layers["Landscape"].visible = False
@@ -791,9 +870,10 @@ class Annotate3D(object):
             else:
                 cluster_points = None
             color = np.asarray(cm(color_id))
-            self.dock_widget.viewer.add_points(cluster_points, size=1, name=f"Cluster_{label}", visible=False,
-                                               shading='spherical', edge_width=0, antialiasing=0,
-                                               face_color=color, metadata={"needs_closest": False, "save": True})
+            cluster_layer = CustomPointsLayer(cluster_points, size=1, name=f"Cluster_{label + 1}", visible=False,
+                                              shading='spherical', edge_width=0, antialiasing=0,
+                                              face_color=color, metadata={"needs_closest": False, "save": True})
+            self.dock_widget.viewer.add_layer(cluster_layer)
 
 
     def _morph_chimerax_fired(self):
@@ -827,6 +907,79 @@ class Annotate3D(object):
             if len(layer.data.shape) == 2:
                 layer.events.data.connect(self.updateConformation)
                 layer.events.highlight.connect(self.updateConformation)
+
+    def on_removing_layer(self, event):
+        if self.allow_removing_cluster_layer:
+            self.allow_modifying_kmeans_layer = False
+            removed_layer = event.value
+            if "Cluster_" in removed_layer.name:
+                cluster_id = int(removed_layer.name.split("_")[-1]) - 1
+
+                # Update saving data
+                if hasattr(self, "z_center"):
+                    self.z_center = np.delete(self.z_center, cluster_id, axis=0)
+
+                # Modify data in KMeans layer
+                layer = [layer for layer in self.dock_widget.viewer.layers if "KMeans" in layer.name]
+                if len(layer) > 0:
+                    layer = layer[0]
+                    layer.data = np.delete(layer.data, cluster_id, axis=0)
+                    self.current_kmeans_data = np.copy(layer.data)
+
+                # Rename layers
+                cluster_id = cluster_id + 2
+                layer_names = [layer.name for layer in self.dock_widget.viewer.layers]
+                while f"Cluster_{cluster_id}" in layer_names:
+                    layer = self.dock_widget.viewer.layers[f"Cluster_{cluster_id}"]
+                    layer._fixed_name = f"Cluster_{cluster_id - 1}"
+                    cluster_id += 1
+
+                self.allow_modifying_kmeans_layer = True
+
+    def on_kmeans_layer_data_removal(self, event):
+        if self.allow_modifying_kmeans_layer:
+            self.allow_removing_cluster_layer = False
+            kmeans_layer = [layer for layer in self.dock_widget.viewer.layers if "KMeans" in layer.name][0]
+            current_data = kmeans_layer.data
+
+            # Find the deleted points by comparing previous data with current data
+            previous_indices = {tuple(point): idx for idx, point in enumerate(self.current_kmeans_data)}
+            current_indices = {tuple(point): idx for idx, point in enumerate(current_data)}
+
+            deleted_points = [point for point in previous_indices if point not in current_indices]
+            deleted_ids = [previous_indices[point] for point in deleted_points]
+            deleted_ids.sort(reverse=True)
+
+            if deleted_points:
+                for deleted_id in deleted_ids:
+                    self.dock_widget.viewer.layers.remove(f"Cluster_{deleted_id + 1}")
+
+                # Update cluster layer names
+                for deleted_id in deleted_ids:
+                    cluster_layers = [layer for layer in self.dock_widget.viewer.layers if "Cluster_" in layer.name]
+                    for layer in cluster_layers:
+                        cluster_id = int(layer.name.split("_")[-1])
+                        if cluster_id > deleted_id + 1:
+                            layer._fixed_name = f"Cluster_{cluster_id - 1}"
+
+            # Update KMeans layer labels
+            translation = np.zeros((1, 3))
+            translation[-1] += -3
+            text = {
+                'string': [f"Cluster {idx + 1}" for idx in range(current_data.shape[0])],
+                'size': 10,
+                'color': 'white',
+                'translation': translation,
+            }
+            kmeans_layer.text = text
+            # kmeans_layer.string = [f"Cluster {idx + 1}" for idx in range(current_data.shape[0])]
+            kmeans_layer.refresh()
+
+            # Update the previous data
+            self.current_kmeans_data = current_data.copy()
+
+            self.allow_removing_cluster_layer = True
+
 
     def selectAxis(self, pos, event):
         axis = int(event.replace("Dim ", "")) - 1
