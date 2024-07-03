@@ -172,6 +172,28 @@ class Server:
                 self.autoencoder.build(input_shape=[(None, generator.xsize, generator.xsize, 1),
                                                     [None, generator.sinusoid_table.shape[1]]])
             self.autoencoder.load_weights(self.metadata["weights"])
+
+        elif self.mode == "FlexSIREN":
+            import h5py
+            from pathlib import Path
+            from tensorflow_toolkit.generators.generator_flexsiren import Generator
+            from tensorflow_toolkit.networks.flexsiren import AutoEncoder
+            md_file = Path(Path(self.metadata["weights"]).parent.parent, "input_particles.xmd")
+            self.outPath = os.path.join(self.metadata["outdir"], "decoded_map_class_{:02d}.mrc")
+
+            # Get xsize from weights file
+            f = h5py.File(self.metadata["weights"], 'r')
+            xsize = int(np.sqrt(f["encoder"]["dense"]["kernel:0"].shape[0]))
+
+            # Create data generator
+            generator = Generator(md_file=md_file, step=1, shuffle=False,
+                                  xsize=xsize)
+
+            # Load model
+            self.autoencoder = AutoEncoder(generator, latDim=self.metadata["lat_dim"],
+                                           architecture=self.metadata["architecture"], jit_compile=False)
+            if generator.mode == "spa":
+                self.autoencoder.build(input_shape=(None, generator.xsize, generator.xsize, 1))
             elif generator.mode == "tomo":
                 self.autoencoder.build(input_shape=[(None, generator.xsize, generator.xsize, 1),
                                                     [None, generator.sinusoid_table.shape[1]]])
@@ -240,6 +262,12 @@ class Server:
             for idx in range(z.shape[0]):
                 ImageHandler().write(decoded_maps[idx], filename=self.outPath.format(idx + 1), overwrite=True)
 
+        elif self.mode == "FlexSIREN":
+            from xmipp_metadata.image_handler import ImageHandler
+            decoded_maps = self.autoencoder.convect_maps(z)
+
+            for idx in range(z.shape[0]):
+                ImageHandler().write(decoded_maps[idx], filename=self.outPath.format(idx + 1), overwrite=True)
 
         elif self.mode == "NMA":
             pass

@@ -87,6 +87,8 @@ class ClientQThread(QThread):
             vol_file = os.path.join(os.path.join(self.path, "vol_{:03d}.mrc"))
         elif self.mode == "HetSIREN":
             vol_file = os.path.join(os.path.join(self.path, "decoded_map_class_{:02d}.mrc"))
+        elif self.mode == "FlexSIREN":
+            vol_file = os.path.join(os.path.join(self.path, "decoded_map_class_{:02d}.mrc"))
         elif self.mode == "NMA":
             vol_file = os.path.join(os.path.join(self.path, "decoded_map_class_{:02d}.mrc"))
         elif self.mode == "3DFlex":
