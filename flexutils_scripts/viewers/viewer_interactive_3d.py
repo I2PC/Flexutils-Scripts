@@ -283,6 +283,11 @@ class Annotate3D(object):
             self.transformer_data = self.transformer.transform(self.z_space)
             self.data = np.copy(self.transformer_data)
 
+        # PCA transformer (for PCA axis sampling)
+        self.pca_transformer = PCA(n_components=self.data.shape[1])
+        self.pca_transformer.fit(self.z_space)
+        self.pca_data = self.pca_transformer.transform(self.z_space)
+
         # Scale data to box of side 300
         self.data = (boxsize - 1) * (self.data - np.amin(self.data)) / (np.amax(self.data) - np.amin(self.data))
 
@@ -810,13 +815,13 @@ class Annotate3D(object):
         self.allow_removing_cluster_layer = True
 
         # Determine the range of PCA DIM and divide into X equal intervals
-        pca_axis = self.transformer_data[..., axis]
+        pca_axis = self.pca_data[..., axis]
         min_pca1, max_pca1 = pca_axis.min(), pca_axis.max()
         intervals = np.linspace(min_pca1, max_pca1, n_clusters + 1)
         means_pca1 = 0.5 * (intervals[:-1] + intervals[1:])
 
         # Initialize lists to hold group means and point indices
-        group_means = np.zeros((n_clusters, self.data.shape[-1]))
+        group_means = np.zeros((n_clusters, self.pca_data.shape[-1]))
         labels = np.empty_like(pca_axis)
         # Compute clusters along dimension and save automatic selection
         for i in range(n_clusters):
@@ -825,7 +830,7 @@ class Annotate3D(object):
             if i == n_clusters - 1:
                 # Ensure the last group includes the max value
                 in_interval = (pca_axis >= intervals[i]) & (pca_axis <= intervals[i + 1])
-            points_in_group = self.transformer_data[in_interval, axis]
+            points_in_group = self.pca_data[in_interval, axis]
 
             if len(points_in_group) > 0:
                 # Assign labels
@@ -837,7 +842,8 @@ class Annotate3D(object):
         self.interp_val = labels.astype(int)
 
         # Cluster always along PCA space
-        z_tr_data = self.transformer.inverse_transform(group_means)
+        z_tr_data = self.pca_transformer.inverse_transform(group_means)
+        group_means = self.transformer.transform(z_tr_data)
         self.z_center = np.copy(z_tr_data)
 
         # Features
@@ -888,13 +894,15 @@ class Annotate3D(object):
             if "Landscape" not in layer.name and "Cluster_" not in layer.name:
                 points = layer.data
                 if points.shape[0] > 0:
-                    _, inds = self.kdtree_data.query(points, k=1)
-                    inds = np.array(inds).flatten()
-                    sel_names = ["vol_%03d" % (idx + 1) for idx in range(points.shape[0])]
-                    z_space = self.z_space[inds]
                     if "along PCA" in layer.name or "KMeans" in layer.name:
                         # z_space = self.transformer.inverse_transform(self.transformer.transform(z_space))
                         z_space = self.z_center
+                        sel_names = ["vol_%03d" % (idx + 1) for idx in range(z_space.shape[0])]
+                    else:
+                        _, inds = self.kdtree_data.query(points, k=1)
+                        inds = np.array(inds).flatten()
+                        sel_names = ["vol_%03d" % (idx + 1) for idx in range(points.shape[0])]
+                        z_space = self.z_space[inds]
                     if z_space.ndim == 1:
                         z_space = z_space[None, ...]
 
@@ -958,6 +966,10 @@ class Annotate3D(object):
             if deleted_points:
                 for deleted_id in deleted_ids:
                     self.dock_widget.viewer.layers.remove(f"Cluster_{deleted_id + 1}")
+
+                    # Update saving data
+                    if hasattr(self, "z_center"):
+                        self.z_center = np.delete(self.z_center, deleted_id, axis=0)
 
                 # Update cluster layer names
                 for deleted_id in deleted_ids:
