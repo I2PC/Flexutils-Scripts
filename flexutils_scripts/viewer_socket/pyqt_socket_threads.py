@@ -28,6 +28,9 @@
 import os
 import shutil
 import signal
+import time
+
+import numpy as np
 from xmipp_metadata.image_handler import ImageHandler
 
 from PyQt5.QtCore import QThread, pyqtSignal
@@ -69,30 +72,39 @@ class ClientQThread(QThread):
 
     def readMap(self, file):
         map = ImageHandler().read(file).getData()
-        return map
+        return np.squeeze(map)
 
     def run(self):
-        for z, file in zip(self.z, self.file_names):
-            self.client.sendDataToSever(z[None, ...])
+        np.savetxt(os.path.join(self.path, "z_server.txt"), self.z)
+        while not os.path.isfile(os.path.join(self.path, "z_server.txt")) and not os.access(os.path.join(self.path, "z_server.txt"), os.R_OK):
+            time.sleep(0.01)
+        self.client.sendDataToSever(os.path.join(self.path, "z_server.txt"))
 
-            # Read generated volume
-            if self.mode == "Zernike3D":
-                vol_file = os.path.join(self.path, "deformed.mrc")
-            elif self.mode == "CryoDrgn":
-                vol_file = os.path.join(os.path.join(self.path, "vol_000.mrc"))
-            elif self.mode == "HetSIREN":
-                vol_file = os.path.join(os.path.join(self.path, "decoded_map_class_01.mrc"))
-            elif self.mode == "NMA":
-                vol_file = os.path.join(os.path.join(self.path, "decoded_map_class_01.mrc"))
+        # Read generated volume
+        if self.mode == "Zernike3D":
+            vol_file = os.path.join(self.path, "deformed_{:02d}.mrc")
+        elif self.mode == "CryoDrgn":
+            vol_file = os.path.join(os.path.join(self.path, "vol_{:03d}.mrc"))
+        elif self.mode == "HetSIREN":
+            vol_file = os.path.join(os.path.join(self.path, "decoded_map_class_{:02d}.mrc"))
+        elif self.mode == "FlexSIREN":
+            vol_file = os.path.join(os.path.join(self.path, "decoded_map_class_{:02d}.mrc"))
+        elif self.mode == "NMA":
+            vol_file = os.path.join(os.path.join(self.path, "decoded_map_class_{:02d}.mrc"))
+        elif self.mode == "3DFlex":
+            vol_file = os.path.join(os.path.join(self.path, "decoded_map_class_{:02d}.mrc"))
 
-            # Emit signals
-            if self.z.shape[0] == 1:
-                generated_map = self.readMap(vol_file)
-                self.volume.emit(generated_map)
-            else:
-                new_path = os.path.join(self.path, file + ".mrc")
-                if new_path != vol_file:
-                    shutil.move(vol_file, new_path)
+        # Emit signals
+        if self.z.shape[0] == 1:
+            generated_map = self.readMap(vol_file.format(1))
+            self.volume.emit(generated_map)
+            os.remove(vol_file.format(1))
+        else:
+            for idx in range(self.z.shape[0]):
+                new_path = os.path.join(self.path, self.file_names[idx] + ".mrc")
+                if vol_file.format(idx + 1) != new_path:
+                    ImageHandler().convert(vol_file.format(idx + 1), new_path, overwrite=True)
+                    os.remove(vol_file.format(idx + 1))
 
         # Emit signals
         if self.z.shape[0] > 1:

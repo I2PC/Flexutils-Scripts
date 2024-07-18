@@ -88,6 +88,9 @@ class GenerateVolumesWorker(QObject):
         elif self.mode == "HetSIREN":
             path = self.kwargs.get("outdir")
             generated_map = self.readMap(os.path.join(path, "decoded_map_class_01.mrc"))
+        elif self.mode == "FlexSIREN":
+            path = self.kwargs.get("outdir")
+            generated_map = self.readMap(os.path.join(path, "decoded_map_class_01.mrc"))
         elif self.mode == "NMA":
             path = self.kwargs.get("outdir")
             generated_map = self.readMap(os.path.join(path, "decoded_map_class_01.mrc"))

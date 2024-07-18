@@ -102,7 +102,7 @@ class Server:
             coords = self.indices - 0.5 * self.metadata["boxSize"]
             groups = mask[self.indices[:, 2], self.indices[:, 1], self.indices[:, 0]]
             self.values = volume[self.indices[:, 2], self.indices[:, 1], self.indices[:, 0]]
-            self.outPath = os.path.join(self.metadata["outdir"], "deformed.mrc")
+            self.outPath = os.path.join(self.metadata["outdir"], "deformed_{:02d}.mrc")
             if np.unique(groups).size > 1:
                 centers = []
                 for group in np.unique(groups):
@@ -112,11 +112,12 @@ class Server:
                 groups, centers = None, None
             self.Z = utl.computeBasis(L1=int(self.metadata["L1"]), L2=int(self.metadata["L2"]),
                                       pos=coords, r=0.5 * self.metadata["boxSize"], groups=groups, centers=centers)
+
         elif self.mode == "CryoDrgn":
             import torch
             from cryodrgn.models import HetOnlyVAE
             from cryodrgn import config
-            self.outPath = os.path.join(self.metadata["outdir"], "vol_{:03d}.mrc".format(0))
+            self.outPath = os.path.join(self.metadata["outdir"], "vol_{:03d}.mrc")
             use_cuda = torch.cuda.is_available()
             device = torch.device("cuda" if use_cuda else "cpu")
             args = types.SimpleNamespace()
@@ -124,10 +125,10 @@ class Server:
             args.D = None
             args.l_extent = None
             args.vol_start_index = 0
-            args.Apix = 1.0
+            args.Apix = self.metadata["apix"]
             args.flip = False
             args.invert = False
-            args.downsample = None
+            args.downsample = int(self.metadata["boxsize"])
             args.qlayers = None
             args.qdim = None
             args.zdim = None
@@ -144,13 +145,14 @@ class Server:
             self.norm = [float(x) for x in cfg["dataset_args"]["norm"]]
             self.model, self.lattice = HetOnlyVAE.load(cfg, self.metadata["weights"], device=device)
             self.model.eval()
+
         elif self.mode == "HetSIREN":
             import h5py
             from pathlib import Path
             from tensorflow_toolkit.generators.generator_het_siren import Generator
             from tensorflow_toolkit.networks.het_siren import AutoEncoder
             md_file = Path(Path(self.metadata["weights"]).parent.parent, "input_particles.xmd")
-            self.outPath = os.path.join(self.metadata["outdir"], "decoded_map_class_{:02d}.mrc".format(1))
+            self.outPath = os.path.join(self.metadata["outdir"], "decoded_map_class_{:02d}.mrc")
 
             # Get xsize from weights file
             f = h5py.File(self.metadata["weights"], 'r')
@@ -162,7 +164,34 @@ class Server:
 
             # Load model
             self.autoencoder = AutoEncoder(generator, het_dim=self.metadata["lat_dim"],
+                                           poseReg=self.metadata["pose_reg"], ctfReg=self.metadata["ctf_reg"],
                                            architecture=self.metadata["architecture"])
+            if generator.mode == "spa":
+                self.autoencoder.build(input_shape=(None, generator.xsize, generator.xsize, 1))
+            elif generator.mode == "tomo":
+                self.autoencoder.build(input_shape=[(None, generator.xsize, generator.xsize, 1),
+                                                    [None, generator.sinusoid_table.shape[1]]])
+            self.autoencoder.load_weights(self.metadata["weights"])
+
+        elif self.mode == "FlexSIREN":
+            import h5py
+            from pathlib import Path
+            from tensorflow_toolkit.generators.generator_flexsiren import Generator
+            from tensorflow_toolkit.networks.flexsiren import AutoEncoder
+            md_file = Path(Path(self.metadata["weights"]).parent.parent, "input_particles.xmd")
+            self.outPath = os.path.join(self.metadata["outdir"], "decoded_map_class_{:02d}.mrc")
+
+            # Get xsize from weights file
+            f = h5py.File(self.metadata["weights"], 'r')
+            xsize = int(np.sqrt(f["encoder"]["dense"]["kernel:0"].shape[0]))
+
+            # Create data generator
+            generator = Generator(md_file=md_file, step=1, shuffle=False,
+                                  xsize=xsize)
+
+            # Load model
+            self.autoencoder = AutoEncoder(generator, latDim=self.metadata["lat_dim"],
+                                           architecture=self.metadata["architecture"], jit_compile=False)
             if generator.mode == "spa":
                 self.autoencoder.build(input_shape=(None, generator.xsize, generator.xsize, 1))
             elif generator.mode == "tomo":
@@ -173,16 +202,21 @@ class Server:
         elif self.mode == "NMA":
             pass
 
+        elif self.mode == "3DFlex":
+            self.outPath = os.path.join(self.metadata["outdir"], "decoded_map_class_{:02d}.mrc")
+
     def generateMap(self, raw_msglen):
-        # raw_msglen = self.recMsg(4)
         msglen = struct.unpack('>I', raw_msglen)[0]
-        z = self.recMsg(msglen)
-        z = pickle.loads(z)
+        z_file = self.recMsg(msglen)
+        z_file = pickle.loads(z_file)
+        z = np.loadtxt(z_file)
+        z = z[None, ...] if z.ndim == 1 else z
 
         if self.mode == "Zernike3D":
             from flexutils_scripts import utils as utl
             from xmipp_metadata.image_handler import ImageHandler
             from scipy.ndimage import gaussian_filter
+            idx = 1
             for zz in z:
                 A = utl.resizeZernikeCoefficients(zz)
                 d_f = self.Z @ A.T
@@ -198,22 +232,61 @@ class Server:
                 def_vol = gaussian_filter(def_vol, sigma=1.0)
 
                 # Save results
-                ImageHandler().write(def_vol, filename=self.outPath, overwrite=True)
+                ImageHandler().write(def_vol, filename=self.outPath.format(idx), overwrite=True)
+
+                idx += 1
+
         elif self.mode == "CryoDrgn":
             from cryodrgn.mrc import MRCFile
+            idx = 1
             for zz in z:
-                vol = self.model.decoder.eval_volume(
-                    self.lattice.coords, self.lattice.D, self.lattice.extent, self.norm, zz
-                )
+                if z.shape[0] > 1:
+                    vol = self.model.decoder.eval_volume(
+                        self.lattice.coords, self.lattice.D, self.lattice.extent, self.norm, zz
+                    )
+                else:
+                    extent = self.lattice.extent * (int(self.metadata["boxsize"]) / (self.lattice.D - 1))
+                    vol = self.model.decoder.eval_volume(
+                        self.lattice.get_downsample_coords(int(self.metadata["boxsize"]) + 1),
+                        int(self.metadata["boxsize"]) + 1, extent, self.norm, zz
+                    )
                 MRCFile.write(
-                    self.outPath, np.array(vol).astype(np.float32), Apix=1.0
+                    self.outPath.format(idx), np.array(vol).astype(np.float32), Apix=1.0
                 )
+                idx += 1
+
         elif self.mode == "HetSIREN":
             from xmipp_metadata.image_handler import ImageHandler
             decoded_maps = self.autoencoder.eval_volume_het(z, allCoords=True, filter=True)
-            ImageHandler().write(decoded_maps, self.outPath, overwrite=True)
+
+            for idx in range(z.shape[0]):
+                ImageHandler().write(decoded_maps[idx], filename=self.outPath.format(idx + 1), overwrite=True)
+
+        elif self.mode == "FlexSIREN":
+            from xmipp_metadata.image_handler import ImageHandler
+            decoded_maps = self.autoencoder.convect_maps(z)
+
+            for idx in range(z.shape[0]):
+                ImageHandler().write(decoded_maps[idx], filename=self.outPath.format(idx + 1), overwrite=True)
+
         elif self.mode == "NMA":
             pass
+
+        elif self.mode == "3DFlex":
+            import cryosparc2
+            from cryosparc2.utils import generateFlexVolumes
+            from xmipp_metadata.image_handler import ImageHandler
+            cryosparc2.Plugin._defineVariables()
+            flexGeneratorJob = generateFlexVolumes(z, self.metadata["projectId"],
+                                                   self.metadata["workSpaceId"],
+                                                   self.metadata["trainJobId"],
+                                                   gpu=self.metadata["csGPU"])
+            flexGeneratorJob = str(flexGeneratorJob.get())
+            for idx in range(z.shape[0]):
+                volume_path = os.path.join(self.metadata["projectPath"], flexGeneratorJob,
+                                           flexGeneratorJob + "_series_000",
+                                           flexGeneratorJob + "_series_000_frame_{:03d}.mrc".format(idx))
+                ImageHandler().convert(volume_path, self.outPath.format(idx + 1))
 
         self.client_socket.sendall("Map generated".encode())
 
@@ -251,6 +324,6 @@ def main():
 if __name__ == '__main__':
     import re
     import sys
+
     sys.argv[0] = re.sub(r'(-script\.pyw|\.exe)?$', '', sys.argv[0])
     sys.exit(main())
-
