@@ -462,7 +462,7 @@ class Annotate3D(object):
         pathFile = os.path.join(self.path, "selections_layers")
 
         if os.path.isdir(pathFile):
-            n_points = sum("Cluster" in filename for filename in glob(os.path.join(pathFile, "*")))
+            n_points = sum("Cluster" in filename for filename in glob(os.path.join(self.path, "*")))
 
             # Generate N evenly spaced values between 0 and 1
             values = np.linspace(0, 1, n_points)
@@ -498,13 +498,13 @@ class Annotate3D(object):
                     }
 
                     # Text labels
-                    translation = np.zeros((1, 3))
-                    translation[-1] += -3
+                    # translation = np.zeros((1, 3))
+                    # translation[-1] += -3
                     text = {
                         'string': 'Cluster {id:d}',
                         'size': 10,
                         'color': 'white',
-                        'translation': translation,
+                        'translation': -3,
                     }
 
                     size = 2
@@ -571,10 +571,10 @@ class Annotate3D(object):
                 names = []
                 selected_z = []
                 if "Landscape" not in layer.name and "Priors" not in layer.name:
-                    layer.save(os.path.join(pathFile, layer.name))
                     points = layer.data
 
                     if len(points) > 0:
+                        layer.save(os.path.join(pathFile, layer.name))
                         if "save" in layer.metadata:
                             metadata = layer.metadata
                             if metadata["save"]:
@@ -767,13 +767,13 @@ class Annotate3D(object):
         }
 
         # Text labels
-        translation = np.zeros((1, selected_data.shape[1]))
-        translation[-1] += -3
+        # translation = np.zeros((1, selected_data.shape[1]))
+        # translation[-1] += -3
         text = {
             'string': 'Cluster {id:d}',
             'size': 10,
             'color': 'white',
-            'translation': translation,
+            'translation': -3,
         }
 
         kmeans_layer = CustomPointsLayer(selected_data, size=2, name="KMeans", metadata={"needs_closest": False,
@@ -791,7 +791,7 @@ class Annotate3D(object):
             self.kmeans_data.append(np.copy(self.data[self.interp_val == label]))
             cluster_points = np.copy(landscape[self.interp_val == label])
             color = np.asarray(cm(color_id))
-            cluster_layer = CustomPointsLayer(cluster_points, size=1, name=f"Cluster_{label + 1}", visible=False,
+            cluster_layer = CustomPointsLayer(cluster_points, size=1, name=f"Cluster_{label + 1:05d}", visible=False,
                                               shading='spherical', edge_width=0, antialiasing=0,
                                               face_color=color, metadata={"needs_closest": False, "save": True})
             self.dock_widget.viewer.add_layer(cluster_layer)
@@ -852,13 +852,13 @@ class Annotate3D(object):
         }
 
         # Text labels
-        translation = np.zeros((1, 3))
-        translation[-1] += -3
+        # translation = np.zeros((1, 3))
+        # translation[-1] += -3
         text = {
             'string': 'Cluster {id:d}',
             'size': 10,
             'color': 'white',
-            'translation': translation,
+            'translation': -3,
         }
 
         group_means = 127 * (group_means - np.amin(self.transformer_data)) / (np.amax(self.transformer_data) - np.amin(self.transformer_data))
@@ -881,7 +881,7 @@ class Annotate3D(object):
             else:
                 cluster_points = None
             color = np.asarray(cm(color_id))
-            cluster_layer = CustomPointsLayer(cluster_points, size=1, name=f"Cluster_{label + 1}", visible=False,
+            cluster_layer = CustomPointsLayer(cluster_points, size=1, name=f"Cluster_{label + 1:05d}", visible=False,
                                               shading='spherical', edge_width=0, antialiasing=0,
                                               face_color=color, metadata={"needs_closest": False, "save": True})
             self.dock_widget.viewer.add_layer(cluster_layer)
@@ -943,8 +943,8 @@ class Annotate3D(object):
                 cluster_id = cluster_id + 2
                 layer_names = [layer.name for layer in self.dock_widget.viewer.layers]
                 while f"Cluster_{cluster_id}" in layer_names:
-                    layer = self.dock_widget.viewer.layers[f"Cluster_{cluster_id}"]
-                    layer._fixed_name = f"Cluster_{cluster_id - 1}"
+                    layer = self.dock_widget.viewer.layers[f"Cluster_{cluster_id:05d}"]
+                    layer._fixed_name = f"Cluster_{cluster_id - 1:05d}"
                     cluster_id += 1
 
                 self.allow_modifying_kmeans_layer = True
@@ -965,7 +965,7 @@ class Annotate3D(object):
 
             if deleted_points:
                 for deleted_id in deleted_ids:
-                    self.dock_widget.viewer.layers.remove(f"Cluster_{deleted_id + 1}")
+                    self.dock_widget.viewer.layers.remove(f"Cluster_{deleted_id + 1:05d}")
 
                     # Update saving data
                     if hasattr(self, "z_center"):
@@ -977,16 +977,16 @@ class Annotate3D(object):
                     for layer in cluster_layers:
                         cluster_id = int(layer.name.split("_")[-1])
                         if cluster_id > deleted_id + 1:
-                            layer._fixed_name = f"Cluster_{cluster_id - 1}"
+                            layer._fixed_name = f"Cluster_{cluster_id - 1:05d}"
 
             # Update KMeans layer labels
-            translation = np.zeros((1, 3))
-            translation[-1] += -3
+            # translation = np.zeros((1, 3))
+            # translation[-1] += -3
             text = {
                 'string': [f"Cluster {idx + 1}" for idx in range(current_data.shape[0])],
                 'size': 10,
                 'color': 'white',
-                'translation': translation,
+                'translation': -3,
             }
             kmeans_layer.text = text
             # kmeans_layer.string = [f"Cluster {idx + 1}" for idx in range(current_data.shape[0])]
