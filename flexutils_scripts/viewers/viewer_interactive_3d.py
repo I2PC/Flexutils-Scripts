@@ -410,11 +410,15 @@ class Annotate3D(object):
                             "architecture": self.class_inputs["architecture"],
                             "pose_reg": self.class_inputs["pose_reg"],
                             "ctf_reg": self.class_inputs["ctf_reg"],
+                            "refinePose": bool(self.class_inputs["refine_pose"]),
                             "outdir": self.path}
             elif self.mode == "FlexSIREN":
                 metadata = {"weights": self.class_inputs["weights"],
                             "lat_dim": self.z_space.shape[1],
                             "architecture": self.class_inputs["architecture"],
+                            "pose_reg": self.class_inputs["pose_reg"],
+                            "ctf_reg": self.class_inputs["ctf_reg"],
+                            "refinePose": bool(self.class_inputs["refine_pose"]),
                             "outdir": self.path}
             elif self.mode == "CryoDrgn":
                 metadata = {"weights": self.class_inputs["weights"],
