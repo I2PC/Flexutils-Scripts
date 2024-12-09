@@ -154,6 +154,10 @@ class Server:
             from pathlib import Path
             from tensorflow_toolkit.generators.generator_het_siren import Generator
             from tensorflow_toolkit.networks.het_siren import AutoEncoder
+            import tensorflow as tf
+            physical_devices = tf.config.list_physical_devices('GPU')
+            for gpu_instance in physical_devices:
+                tf.config.experimental.set_memory_growth(gpu_instance, True)
             md_file = Path(Path(self.metadata["weights"]).parent.parent, "input_particles.xmd")
             self.outPath = os.path.join(self.metadata["outdir"], "decoded_map_class_{:02d}.mrc")
 
@@ -170,7 +174,8 @@ class Server:
             self.autoencoder = AutoEncoder(generator, het_dim=self.metadata["lat_dim"],
                                            poseReg=self.metadata["pose_reg"], ctfReg=self.metadata["ctf_reg"],
                                            architecture=self.metadata["architecture"],
-                                           refPose=self.metadata["refinePose"])
+                                           refPose=self.metadata["refinePose"],
+                                           use_hyper_network=self.metadata["useHyperNetwork"])
             if generator.mode == "spa":
                 inputs = np.zeros((1, generator.xsize, generator.xsize, 1))
             elif generator.mode == "tomo":
@@ -184,7 +189,12 @@ class Server:
             import h5py
             from pathlib import Path
             from tensorflow_toolkit.generators.generator_flexsiren import Generator
-            from tensorflow_toolkit.networks.flexsiren_basis import AutoEncoder
+            from tensorflow_toolkit.networks.flexsiren import AutoEncoder
+            import tensorflow as tf
+            physical_devices = tf.config.list_physical_devices('GPU')
+            for gpu_instance in physical_devices:
+                tf.config.experimental.set_memory_growth(gpu_instance, True)
+
             md_file = Path(Path(self.metadata["weights"]).parent.parent, "input_particles.xmd")
             self.outPath = os.path.join(self.metadata["outdir"], "decoded_map_class_{:02d}.mrc")
 
@@ -198,7 +208,8 @@ class Server:
                                   xsize=xsize, refinePose=self.metadata["refinePose"])
 
             # Load model
-            self.autoencoder = AutoEncoder(generator, latDim=int(self.metadata["lat_dim"] / 3),  # For FlexSIREN with basis
+            latDim = self.metadata["lat_dim"]
+            self.autoencoder = AutoEncoder(generator, latDim=int(latDim),  # For FlexSIREN with basis
                                            poseReg=self.metadata["pose_reg"], ctfReg=self.metadata["ctf_reg"],
                                            architecture=self.metadata["architecture"], jit_compile=False)
             imgs = np.zeros((1, generator.xsize, generator.xsize, 1))
