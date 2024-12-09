@@ -411,6 +411,7 @@ class Annotate3D(object):
                             "pose_reg": self.class_inputs["pose_reg"],
                             "ctf_reg": self.class_inputs["ctf_reg"],
                             "refinePose": bool(self.class_inputs["refine_pose"]),
+                            "useHyperNetwork": bool(self.class_inputs["use_hyper_network"]),
                             "outdir": self.path}
             elif self.mode == "FlexSIREN":
                 metadata = {"weights": self.class_inputs["weights"],
