@@ -33,6 +33,7 @@ from contextlib import closing
 import pickle
 import types
 import struct
+from importlib.metadata import version
 
 
 class Server:
@@ -147,16 +148,23 @@ class Server:
             self.model.eval()
 
         elif self.mode == "HetSIREN":
+            if version("tensorflow") >= "2.16.0":
+                os.environ["TF_USE_LEGACY_KERAS"] = "1"
             import h5py
             from pathlib import Path
             from tensorflow_toolkit.generators.generator_het_siren import Generator
             from tensorflow_toolkit.networks.het_siren import AutoEncoder
+            import tensorflow as tf
+            physical_devices = tf.config.list_physical_devices('GPU')
+            for gpu_instance in physical_devices:
+                tf.config.experimental.set_memory_growth(gpu_instance, True)
             md_file = Path(Path(self.metadata["weights"]).parent.parent, "input_particles.xmd")
             self.outPath = os.path.join(self.metadata["outdir"], "decoded_map_class_{:02d}.mrc")
 
             # Get xsize from weights file
             f = h5py.File(self.metadata["weights"], 'r')
             xsize = int(np.sqrt(f["encoder"]["dense"]["kernel:0"].shape[0]))
+            # xsize = int(np.sqrt(f["encoder_exp"]["encoder"]["layers"]["dense"]["vars"]["0"].shape[0]))
 
             # Create data generator
             generator = Generator(md_file=md_file, step=1, shuffle=False,
@@ -165,38 +173,47 @@ class Server:
             # Load model
             self.autoencoder = AutoEncoder(generator, het_dim=self.metadata["lat_dim"],
                                            poseReg=self.metadata["pose_reg"], ctfReg=self.metadata["ctf_reg"],
-                                           architecture=self.metadata["architecture"])
+                                           architecture=self.metadata["architecture"],
+                                           refPose=self.metadata["refinePose"],
+                                           use_hyper_network=self.metadata["useHyperNetwork"])
             if generator.mode == "spa":
-                self.autoencoder.build(input_shape=(None, generator.xsize, generator.xsize, 1))
+                inputs = np.zeros((1, generator.xsize, generator.xsize, 1))
             elif generator.mode == "tomo":
-                self.autoencoder.build(input_shape=[(None, generator.xsize, generator.xsize, 1),
-                                                    [None, generator.sinusoid_table.shape[1]]])
+                inputs = [np.zeros((1, generator.xsize, generator.xsize, 1)), np.zeros((1, generator.sinusoid_table.shape[1]))]
+            _ = self.autoencoder(inputs)
             self.autoencoder.load_weights(self.metadata["weights"])
 
         elif self.mode == "FlexSIREN":
+            if version("tensorflow") >= "2.16.0":
+                os.environ["TF_USE_LEGACY_KERAS"] = "1"
             import h5py
             from pathlib import Path
             from tensorflow_toolkit.generators.generator_flexsiren import Generator
             from tensorflow_toolkit.networks.flexsiren import AutoEncoder
+            import tensorflow as tf
+            physical_devices = tf.config.list_physical_devices('GPU')
+            for gpu_instance in physical_devices:
+                tf.config.experimental.set_memory_growth(gpu_instance, True)
+
             md_file = Path(Path(self.metadata["weights"]).parent.parent, "input_particles.xmd")
             self.outPath = os.path.join(self.metadata["outdir"], "decoded_map_class_{:02d}.mrc")
 
             # Get xsize from weights file
             f = h5py.File(self.metadata["weights"], 'r')
             xsize = int(np.sqrt(f["encoder"]["dense"]["kernel:0"].shape[0]))
+            # xsize = int(np.sqrt(f["encoder_exp"]["encoder"]["layers"]["dense"]["vars"]["0"].shape[0]))
 
             # Create data generator
             generator = Generator(md_file=md_file, step=1, shuffle=False,
-                                  xsize=xsize)
+                                  xsize=xsize, refinePose=self.metadata["refinePose"])
 
             # Load model
-            self.autoencoder = AutoEncoder(generator, latDim=self.metadata["lat_dim"],
+            latDim = self.metadata["lat_dim"]
+            self.autoencoder = AutoEncoder(generator, latDim=int(latDim),  # For FlexSIREN with basis
+                                           poseReg=self.metadata["pose_reg"], ctfReg=self.metadata["ctf_reg"],
                                            architecture=self.metadata["architecture"], jit_compile=False)
-            if generator.mode == "spa":
-                self.autoencoder.build(input_shape=(None, generator.xsize, generator.xsize, 1))
-            elif generator.mode == "tomo":
-                self.autoencoder.build(input_shape=[(None, generator.xsize, generator.xsize, 1),
-                                                    [None, generator.sinusoid_table.shape[1]]])
+            imgs = np.zeros((1, generator.xsize, generator.xsize, 1))
+            _ = self.autoencoder(imgs)
             self.autoencoder.load_weights(self.metadata["weights"])
 
         elif self.mode == "NMA":

@@ -338,7 +338,7 @@ class Annotate3D(object):
         vol = np.real(np.fft.ifftn(np.fft.ifftshift(ft_vol)))[5:133, 5:133, 5:133]
 
         # Label generation
-        clusters = MiniBatchKMeans(n_clusters=100).fit(indeces)
+        clusters = MiniBatchKMeans(n_clusters=min(indeces.shape[0], 100)).fit(indeces)
         values = clusters.labels_ + 1
         labels = np.zeros((boxsize, boxsize, boxsize))
         labels[indeces[:, 0], indeces[:, 1], indeces[:, 2]] += values
@@ -410,11 +410,16 @@ class Annotate3D(object):
                             "architecture": self.class_inputs["architecture"],
                             "pose_reg": self.class_inputs["pose_reg"],
                             "ctf_reg": self.class_inputs["ctf_reg"],
+                            "refinePose": bool(self.class_inputs["refine_pose"]),
+                            "useHyperNetwork": bool(self.class_inputs["use_hyper_network"]),
                             "outdir": self.path}
             elif self.mode == "FlexSIREN":
                 metadata = {"weights": self.class_inputs["weights"],
                             "lat_dim": self.z_space.shape[1],
                             "architecture": self.class_inputs["architecture"],
+                            "pose_reg": self.class_inputs["pose_reg"],
+                            "ctf_reg": self.class_inputs["ctf_reg"],
+                            "refinePose": bool(self.class_inputs["refine_pose"]),
                             "outdir": self.path}
             elif self.mode == "CryoDrgn":
                 metadata = {"weights": self.class_inputs["weights"],
