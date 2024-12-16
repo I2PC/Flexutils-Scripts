@@ -338,7 +338,7 @@ class Annotate3D(object):
         vol = np.real(np.fft.ifftn(np.fft.ifftshift(ft_vol)))[5:133, 5:133, 5:133]
 
         # Label generation
-        clusters = MiniBatchKMeans(n_clusters=100).fit(indeces)
+        clusters = MiniBatchKMeans(n_clusters=min(indeces.shape[0], 100)).fit(indeces)
         values = clusters.labels_ + 1
         labels = np.zeros((boxsize, boxsize, boxsize))
         labels[indeces[:, 0], indeces[:, 1], indeces[:, 2]] += values
