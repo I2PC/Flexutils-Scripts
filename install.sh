@@ -65,11 +65,15 @@ conda activate flexutils
 pip install -e $SCRIPT_DIR
 
 # Setup Tensorflow
-#mkdir -p $CONDA_PREFIX/etc/conda/activate.d
-#echo export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib/ >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
-#echo export XLA_FLAGS=--xla_gpu_cuda_data_dir=$CONDA_PREFIX/lib/ >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
-#mkdir -p $CONDA_PREFIX/lib/nvvm/libdevice
-#cp $CONDA_PREFIX/lib/libdevice.10.bc $CONDA_PREFIX/lib/nvvm/libdevice/
+mkdir -p $CONDA_PREFIX/etc/conda/activate.d
+export OLD_LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
+echo export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib/ >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
+echo export XLA_FLAGS=--xla_gpu_cuda_data_dir=$CONDA_PREFIX/lib/ >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
+mkdir -p $CONDA_PREFIX/lib/nvvm/libdevice
+cp $CONDA_PREFIX/lib/libdevice.10.bc $CONDA_PREFIX/lib/nvvm/libdevice/
+mkdir -p $CONDA_PREFIX/etc/conda/deactivate.d
+export LD_LIBRARY_PATH=${OLD_LD_LIBRARY_PATH}
+unset OLD_LD_LIBRARY_PATH
 
 # Deactivate environment and finish installation
 conda deactivate
