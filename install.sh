@@ -62,6 +62,9 @@ conda env create -f $SCRIPT_DIR/requirements/flexutils_env.yml
 
 # Install current package in Flexutils env
 conda activate flexutils
+if [ $? -ne 0 ]; then
+  exit 1
+fi
 pip install -e $SCRIPT_DIR
 
 # Setup Tensorflow
