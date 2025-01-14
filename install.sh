@@ -47,7 +47,7 @@ PREV_ENV_NAME=$(conda info --envs | grep 'flexutils' | grep -v 'tensorflow' | aw
 #PREV_VERSION="${env_name##*-}"
 
 #if [ "PREV_VERSION" != "$VERSION" ] && [ ! -z "PREV_ENV_NAME" ]; then
-if [ ! -z "PREV_ENV_NAME" ]; then
+if [ "PREV_ENV_NAME" == " " ]; then
     echo "Found Flexutils environment(s)"
     conda env remove -n $PREV_ENV_NAME
 fi
