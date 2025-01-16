@@ -33,6 +33,16 @@ colored_echo() {
     printf "%b%s%b\n" "$color_code" "$text" "$reset"
 }
 
+# Read input parameters
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --condaBin) CONDABIN="$2"; shift ;; # Capture the first argument
+        -h|--help) echo "Usage: $0 [--condaBin VALUE]"; exit 0 ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+    shift
+done
+
 colored_echo "green" "-------------- Installing Flexutils scripts --------------"
 
 # Get the full path of the current script, resolving symlinks
@@ -52,10 +62,21 @@ if [ "PREV_ENV_NAME" == " " ]; then
     conda env remove -n $PREV_ENV_NAME
 fi
 
-# Source the conda.sh script
-CONDA_PATH=$(conda info --base)
-CONDA_SH="$CONDA_PATH/etc/profile.d/conda.sh"
-source "$CONDA_SH"
+## Source the conda.sh script (WE KEEP THIS IN CASE IT IS USEFUL)
+#CONDA_PATH=$(conda info --base)
+#CONDA_SH="$CONDA_PATH/etc/profile.d/conda.sh"
+#source "$CONDA_SH"
+
+# Activate conda in shell
+if [[ ! -v CONDABIN ]]; then
+  if which conda | sed 's: ::g' &> /dev/null ; then
+    CONDABIN=$(which conda | sed 's: ::g')
+    eval "$($CONDABIN shell.bash hook)"
+  else
+    colored_echo "red" "Conda not found in path - Exiting"
+    exit 1
+  fi
+fi
 
 # Install new flexutils environment
 conda env create -f $SCRIPT_DIR/requirements/flexutils_env.yml
