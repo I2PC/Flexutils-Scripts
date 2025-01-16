@@ -33,6 +33,14 @@ colored_echo() {
     printf "%b%s%b\n" "$color_code" "$text" "$reset"
 }
 
+# Check exit status
+check_exit_status() {
+  if [ $? -ne 0 ]; then
+    echo "An error occurred. Exiting."
+    exit 1
+  fi
+}
+
 # Read input parameters
 while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -82,12 +90,11 @@ fi
 
 # Install new flexutils environment
 conda env create -f $SCRIPT_DIR/requirements/flexutils_env.yml
+check_exit_status
 
 # Install current package in Flexutils env
 conda activate flexutils
-if [ $? -ne 0 ]; then
-  exit 1
-fi
+check_exit_status
 pip install -e $SCRIPT_DIR
 
 # Setup Tensorflow
