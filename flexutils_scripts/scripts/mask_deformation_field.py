@@ -46,7 +46,8 @@ def iterRowsAndClone(metadata):
 
 def computeNewDeformationField(row, Z, start_coords, mask_DF, Z_new):
     outRow = row
-    z_clnm = row["MDL_SPH_COEFFICIENTS"]
+    z_clnm_string = ",".join(row["sphCoefficients"].replace(",", " ").split())
+    z_clnm = np.asarray(np.fromstring(z_clnm_string, sep=','))
     A = utl.resizeZernikeCoefficients(z_clnm)
 
     # Get Masked deformation field
@@ -54,14 +55,14 @@ def computeNewDeformationField(row, Z, start_coords, mask_DF, Z_new):
 
     # Write Zernike3D coefficients to file
     z_clnm = utl.resizeZernikeCoefficients(A_masked)
-    outRow["MDL_SPH_COEFFICIENTS"] = z_clnm
+    outRow["sphCoefficients"] = ','.join([str(x) for x in z_clnm])
 
     # For evaluation (debuggin purposes)
     d = Z_new @ A_masked.T
 
     # Compute mean deformation
     deformation = np.sqrt(np.mean(np.sum(d ** 2, axis=1)))
-    outRow["MDL_SPH_DEFORMATION"] = deformation
+    outRow["sphDeformation"] = deformation
 
     return outRow
 
@@ -70,6 +71,12 @@ def maskDeformationField(md_file, maski, maskdf, prevL1, prevL2, L1, L2, Rmax, t
     # Read data
     start_mask = utl.readMap(maski)
     mask_DF = utl.readMap(maskdf)
+
+    # Reduce the number of coordinates to be used (only if volume has size > 256)
+    if start_mask.shape[0] > 256:
+        modified_mask = np.zeros_like(start_mask)
+        modified_mask[::2, ::2, ::2] = start_mask[::2, ::2, ::2]
+        start_mask = modified_mask
 
     # Get Xmipp origin
     xmipp_origin = utl.getXmippOrigin(start_mask)
@@ -94,9 +101,7 @@ def maskDeformationField(md_file, maski, maskdf, prevL1, prevL2, L1, L2, Rmax, t
               for row in metadata)
 
     # Fill output metadata
-    metadata_out = XmippMetaData(None)
-    for outRow in outRows:
-        metadata_out.appendMetaDataRows(outRow)
+    metadata_out = XmippMetaData(rows=outRows)
 
     dir = os.path.dirname(md_file)
     metadata_out.write(os.path.join(dir, "inputParticles_focused.xmd"), overwrite=True)
