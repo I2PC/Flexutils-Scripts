@@ -27,6 +27,7 @@
 
 
 import os
+import shutil
 import numpy as np
 import socket
 from contextlib import closing
@@ -303,7 +304,7 @@ class Server:
                 volume_path = os.path.join(self.metadata["projectPath"], flexGeneratorJob,
                                            flexGeneratorJob + "_series_000",
                                            flexGeneratorJob + "_series_000_frame_{:03d}.mrc".format(idx))
-                ImageHandler().convert(volume_path, self.outPath.format(idx + 1))
+                shutil.copyfile(volume_path, self.outPath.format(idx + 1))
 
         self.client_socket.sendall("Map generated".encode())
 

@@ -33,6 +33,24 @@ colored_echo() {
     printf "%b%s%b\n" "$color_code" "$text" "$reset"
 }
 
+# Check exit status
+check_exit_status() {
+  if [ $? -ne 0 ]; then
+    echo "An error occurred. Exiting."
+    exit 1
+  fi
+}
+
+# Read input parameters
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --condaBin) CONDABIN="$2"; shift ;; # Capture the first argument
+        -h|--help) echo "Usage: $0 [--condaBin VALUE]"; exit 0 ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+    shift
+done
+
 colored_echo "green" "-------------- Installing Flexutils scripts --------------"
 
 # Get the full path of the current script, resolving symlinks
@@ -47,29 +65,47 @@ PREV_ENV_NAME=$(conda info --envs | grep 'flexutils' | grep -v 'tensorflow' | aw
 #PREV_VERSION="${env_name##*-}"
 
 #if [ "PREV_VERSION" != "$VERSION" ] && [ ! -z "PREV_ENV_NAME" ]; then
-if [ ! -z "PREV_ENV_NAME" ]; then
+if [ "PREV_ENV_NAME" == " " ]; then
     echo "Found Flexutils environment(s)"
     conda env remove -n $PREV_ENV_NAME
 fi
 
-# Source the conda.sh script
-CONDA_PATH=$(conda info --base)
-CONDA_SH="$CONDA_PATH/etc/profile.d/conda.sh"
-source "$CONDA_SH"
+## Source the conda.sh script (WE KEEP THIS IN CASE IT IS USEFUL)
+#CONDA_PATH=$(conda info --base)
+#CONDA_SH="$CONDA_PATH/etc/profile.d/conda.sh"
+#source "$CONDA_SH"
+
+# Activate conda in shell
+if [[ ! -v CONDABIN ]]; then
+  if which conda | sed 's: ::g' &> /dev/null ; then
+    CONDABIN=$(which conda | sed 's: ::g')
+    eval "$($CONDABIN shell.bash hook)"
+  else
+    colored_echo "red" "Conda not found in path - Exiting"
+    exit 1
+  fi
+else
+  eval "$($CONDABIN shell.bash hook)"
+fi
 
 # Install new flexutils environment
 conda env create -f $SCRIPT_DIR/requirements/flexutils_env.yml
+check_exit_status
 
 # Install current package in Flexutils env
 conda activate flexutils
+check_exit_status
 pip install -e $SCRIPT_DIR
 
 # Setup Tensorflow
-#mkdir -p $CONDA_PREFIX/etc/conda/activate.d
-#echo export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib/ >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
-#echo export XLA_FLAGS=--xla_gpu_cuda_data_dir=$CONDA_PREFIX/lib/ >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
-#mkdir -p $CONDA_PREFIX/lib/nvvm/libdevice
-#cp $CONDA_PREFIX/lib/libdevice.10.bc $CONDA_PREFIX/lib/nvvm/libdevice/
+mkdir -p $CONDA_PREFIX/etc/conda/activate.d
+echo export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib/ >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
+echo export XLA_FLAGS=--xla_gpu_cuda_data_dir=$CONDA_PREFIX/lib/ >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
+mkdir -p $CONDA_PREFIX/lib/nvvm/libdevice
+cp $CONDA_PREFIX/lib/libdevice.10.bc $CONDA_PREFIX/lib/nvvm/libdevice/
+mkdir -p $CONDA_PREFIX/etc/conda/deactivate.d
+echo escaped_lhs=$(printf '%s\n' "$CONDA_PREFIX/lib/" | sed 's:[][\\/.^$*]:\\&:g')
+echo export LD_LIBRARY_PATH=$(echo "$LD_LIBRARY_PATH" | sed "s/$escaped_lhs//")
 
 # Deactivate environment and finish installation
 conda deactivate

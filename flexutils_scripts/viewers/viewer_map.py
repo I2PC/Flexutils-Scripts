@@ -146,9 +146,7 @@ class MapView(HasTraits):
 
     def _df_stats_default(self):
         metadata = XmippMetaData(self.metadata_file)
-        z_space = np.asarray(metadata.getMetaDataColumns("sphCoefficients"))
-        # mean_df = np.zeros(self.coords_map.shape)
-        # std_df = np.zeros(self.coords_map.shape)
+        z_space = np.asarray([np.fromstring(item, sep=',') for item in metadata[:, "zernikeCoefficients"]])
         path = os.path.dirname(self.metadata_file)
         df_mean_file = os.path.join(path, "mean_df.txt")
         df_std_file = os.path.join(path, "std_df.txt")
@@ -160,16 +158,8 @@ class MapView(HasTraits):
             print("Computing deformation field statistics from particles...")
             R = 0.5 * self.map.shape[0]
             coords_xo = self.coords_map - R
-            mean_df, std_df = summers(z_space, int(self.class_inputs.get("L1")),
-                              int(self.class_inputs.get("L2")), coords_xo, R,
-                              int(self.class_inputs.get("thr")))
-            # for z in tqdm(z_space):
-            #     Z = computeBasis(L1=int(self.class_inputs.get("L1")),
-            #                      L2=int(self.class_inputs.get("L2")),
-            #                      pos=coords_xo, r=0.5*self.map.shape[0])
-            #     A = resizeZernikeCoefficients(z)
-            #     mean_df = mean_df + Z @ A.T
-            #     std_df = std_df + mean_df * mean_df
+            mean_df, std_df = compute_average_field(z_space, int(self.class_inputs.get("L1")),
+                                                    int(self.class_inputs.get("L2")), coords_xo, R)
             mean_df /= z_space.shape[0]
             std_df = np.sqrt(std_df / z_space.shape[0] - mean_df * mean_df)
             np.savetxt(df_mean_file, mean_df)
@@ -443,40 +433,31 @@ class MapView(HasTraits):
 # ---------------------------------------------------------------------------
 # Parallel computation of motion statistics
 # ---------------------------------------------------------------------------
-def computation(z, L1, L2, coords, r):
-    Z = computeBasis(L1=L1,
-                     L2=L2,
-                     pos=coords, r=r)
-    A = resizeZernikeCoefficients(z)
-    return Z @ A.T
+def compute_average_field(z_space, L1, L2, coords, r):
+    if not z_space.size:
+        return None, None
 
-def summers(z_space, L1, L2, coords, r, processes):
-    pool = multiprocessing.Pool(processes=processes)
-    pbar = tqdm(total=z_space.shape[0])
+    # Compute basis and basis square
+    Z = computeBasis(L1=L1, L2=L2, pos=coords, r=r)
+    Z2 = Z * Z
 
-    class Sum:
-        def __init__(self, coords):
-            self.value_1 = np.zeros(coords.shape)
-            self.value_2 = np.zeros(coords.shape)
-            self.lock = _thread.allocate_lock()
-            self.count = 0
+    # Compute coefficients and coefficients square
+    z = np.sum(z_space, axis=0, keepdims=True)
+    z2 = np.sum(z_space * z_space, axis=0, keepdims=True)
 
-        def add(self, value):
-            self.count += 1
-            self.lock.acquire()
-            self.value_1 += value
-            self.value_2 += value * value
-            self.lock.release()
-            pbar.update(1)
+    # Resize Zernike coefficients
+    size = int(z_space.shape[1] / 3)
+    A = np.stack([z[..., :size], z[..., size:2 * size], z[..., 2 * size:]], axis=-1)
+    A2 = np.stack([z2[..., :size], z2[..., size:2 * size], z2[..., 2 * size:]], axis=-1)
 
-    sumArr = Sum(coords)
-    for z in z_space:
-        singlepoolresult = pool.apply_async(computation, (z, L1, L2, coords, r), callback=sumArr.add)
+    # Compute fields
+    d = np.squeeze(Z @ A.T).T
+    d2 = np.squeeze(Z2 @ A2.T).T
+    print(d.shape)
+    return d, d2
 
-    pool.close()
-    pool.join()
 
-    return sumArr.value_1, sumArr.value_2
+
 # ---------------------------------------------------------------------------
 
 
