@@ -209,7 +209,7 @@ class MultipleViewerWidget(QSplitter):
             self.right_widgets.append(Button(label="Extract selection to layer"))
             self.right_widgets.append(ComboBox(choices=[], label="# layer"))
             self.right_widgets.append(Button(label="Add selection to # layer"))
-            self.right_widgets.append(Slider(value=100, min=1, max=300, label="Landscape-Vol-Labels #"))
+            # self.right_widgets.append(Slider(value=100, min=1, max=300, label="Landscape-Vol-Labels #"))
             self.right_widgets.append(Slider(value=percentage, min=0, max=100, label="Landscape downsampling"))
             self.select_axis_container = Container(widgets=self.right_widgets)
             w1 = QtLayerControlsContainer(self.viewer_model1)
@@ -301,11 +301,16 @@ class Annotate3D(object):
         self.kdtree_z_pace = KDTree(self.z_space)
 
         # Set data in viewers
-        points_layer = self.dock_widget.viewer.add_points(np.copy(data[:, :3]), size=1, shading='spherical',
+        points_layer = CustomPointsLayer(np.copy(data[:, :3]), size=1, shading='spherical',
                                                           edge_width=0,
                                                           antialiasing=0,
                                                           blending="additive", name="Landscape")
+        # points_layer = self.dock_widget.viewer.add_points(np.copy(data[:, :3]), size=1, shading='spherical',
+        #                                                   edge_width=0,
+        #                                                   antialiasing=0,
+        #                                                   blending="additive", name="Landscape")
         points_layer.editable = True
+        self.dock_widget.viewer.add_layer(points_layer)
 
         # Set extra data layer (like priors) in viewer
         if "z_space_vol" in self.class_inputs:
@@ -346,7 +351,7 @@ class Annotate3D(object):
 
         # Add volume and labels
         self.view.add_image(vol, rgb=False, colormap="inferno", name="Landscape-Vol", opacity=0.5)
-        self.view.add_labels(labels, name='Landscape-Vol-Labels', visible=False)
+        # self.view.add_labels(labels, name='Landscape-Vol-Labels', visible=False)
         # vol_layer.editable = False
 
         if interactive:
@@ -376,11 +381,11 @@ class Annotate3D(object):
             self.dock_widget.right_widgets[1].changed.connect(lambda event: self.selectAxis(1, event))
             self.dock_widget.right_widgets[2].changed.connect(lambda event: self.selectAxis(2, event))
             self.dock_widget.right_widgets[3].changed.connect(self.updateVolSigma)
-            self.dock_widget.right_widgets[8].changed.connect(self.updateDownsampling)
+            self.dock_widget.right_widgets[7].changed.connect(self.updateDownsampling)
             self.dock_widget.right_widgets[5].choices = self.getLayerChoices
             self.dock_widget.right_widgets[4].changed.connect(self.extractSelectionToLayer)
             self.dock_widget.right_widgets[6].changed.connect(self.addSelectionToLayer)
-            self.dock_widget.right_widgets[7].changed.connect(self.updateVolLabels)
+            # self.dock_widget.right_widgets[7].changed.connect(self.updateVolLabels)
 
             # Worker threads
             self.thread_chimerax = None
