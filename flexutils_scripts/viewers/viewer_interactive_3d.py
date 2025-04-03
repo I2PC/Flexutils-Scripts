@@ -654,7 +654,7 @@ class Annotate3D(object):
             # Layer to select from
             layer = viewer.layers.selection._current
 
-            if isinstance(layer, napari.layers.Points):
+            if isinstance(layer, napari.layers.Points) or isinstance(layer, CustomPointsLayer):
                 ndims = layer._view_data.shape[1]
 
                 # Lasso layer
