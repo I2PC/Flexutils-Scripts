@@ -255,7 +255,11 @@ class Server:
                 idx += 1
 
         elif self.mode == "CryoDrgn":
-            from cryodrgn.mrc import MRCFile
+            try:
+                from cryodrgn.mrc import MRCFile
+                write_mrc = MRCFile.write
+            except ImportError:
+                from cryodrgn.mrcfile import write_mrc
             idx = 1
             for zz in z:
                 if z.shape[0] > 1:
@@ -268,8 +272,8 @@ class Server:
                         self.lattice.get_downsample_coords(int(self.metadata["boxsize"]) + 1),
                         int(self.metadata["boxsize"]) + 1, extent, self.norm, zz
                     )
-                MRCFile.write(
-                    self.outPath.format(idx), np.array(vol).astype(np.float32), Apix=1.0
+                write_mrc(
+                    self.outPath.format(idx), np.array(vol).astype(np.float32)
                 )
                 idx += 1
 
