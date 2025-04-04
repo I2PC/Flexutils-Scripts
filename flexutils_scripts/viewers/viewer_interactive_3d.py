@@ -114,6 +114,22 @@ class CustomPointsLayer(napari.layers.Points):
             points_layer.properties[key] = value
         points_layer.save(path)
 
+
+class CustomImageLayer(napari.layers.Image):
+    def __init__(self, data=None, *args, **kwargs):
+        super().__init__(data, *args, **kwargs)
+        self._fixed_name = kwargs.get("name")  # Store the initial name
+
+    @property
+    def name(self):
+        return self._fixed_name
+
+    @name.setter
+    def name(self, value):
+        # Prevent renaming by ignoring any attempts to change the name
+        pass
+
+
 class PCA_UMAP:
     '''Auxiliar class to align an UMAP cloud along its principal components'''
     def __init__(self, umap):
@@ -343,14 +359,17 @@ class Annotate3D(object):
         vol = np.real(np.fft.ifftn(np.fft.ifftshift(ft_vol)))[5:133, 5:133, 5:133]
 
         # Label generation
-        clusters = MiniBatchKMeans(n_clusters=min(indeces.shape[0], 100)).fit(indeces)
-        values = clusters.labels_ + 1
-        labels = np.zeros((boxsize, boxsize, boxsize))
-        labels[indeces[:, 0], indeces[:, 1], indeces[:, 2]] += values
-        labels = labels.astype(int)
+        # clusters = MiniBatchKMeans(n_clusters=min(indeces.shape[0], 100)).fit(indeces)
+        # values = clusters.labels_ + 1
+        # labels = np.zeros((boxsize, boxsize, boxsize))
+        # labels[indeces[:, 0], indeces[:, 1], indeces[:, 2]] += values
+        # labels = labels.astype(int)
 
         # Add volume and labels
-        self.view.add_image(vol, rgb=False, colormap="inferno", name="Landscape-Vol", opacity=0.5)
+        # self.view.add_image(vol, rgb=False, colormap="inferno", name="Landscape-Vol", opacity=0.5)
+        landscape_vol_layer = CustomImageLayer(vol, rgb=False, colormap="inferno", name="Landscape-Vol", opacity=0.5,
+                                               blending='translucent_no_depth')
+        self.view.add_layer(landscape_vol_layer)
         # self.view.add_labels(labels, name='Landscape-Vol-Labels', visible=False)
         # vol_layer.editable = False
 
