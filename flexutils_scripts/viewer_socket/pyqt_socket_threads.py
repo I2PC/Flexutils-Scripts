@@ -26,7 +26,6 @@
 
 
 import os
-import shutil
 import signal
 import time
 
@@ -109,10 +108,16 @@ class ClientQThread(QThread):
         return smoothed_grid
 
     def run(self):
-        np.savetxt(os.path.join(self.path, "z_server.txt"), self.z)
-        while not os.path.isfile(os.path.join(self.path, "z_server.txt")) and not os.access(os.path.join(self.path, "z_server.txt"), os.R_OK):
-            time.sleep(0.01)
-        self.client.sendDataToSever(os.path.join(self.path, "z_server.txt"))
+        if not self.mode == "FromFiles":
+            np.savetxt(os.path.join(self.path, "z_server.txt"), self.z)
+            while not os.path.isfile(os.path.join(self.path, "z_server.txt")) and not os.access(os.path.join(self.path, "z_server.txt"), os.R_OK):
+                time.sleep(0.01)
+            self.client.sendDataToSever(os.path.join(self.path, "z_server.txt"))
+        else:
+            with open(os.path.join(self.path, "z_server.pkl"), 'w') as f:
+                for line in self.z:
+                    f.write("%s\n" % line)
+            self.client.sendDataToSever(os.path.join(self.path, "z_server.pkl"))
 
         # Read generated volume
         if self.mode == "Zernike3D":
@@ -125,11 +130,11 @@ class ClientQThread(QThread):
             vol_file = os.path.join(os.path.join(self.path, "decoded_map_class_{:02d}.mrc"))
         elif self.mode == "NMA":
             vol_file = os.path.join(os.path.join(self.path, "decoded_map_class_{:02d}.mrc"))
-        elif self.mode == "3DFlex":
+        elif self.mode == "3DFlex" or self.mode == "FromFiles":
             vol_file = os.path.join(os.path.join(self.path, "decoded_map_class_{:02d}.mrc"))
 
         # Emit signals
-        if self.z.shape[0] == 1:
+        if len(self.z) == 1:
             if vol_file.split(".")[-1] == "mrc":
                 generated_map = self.readMap(vol_file.format(1))
             elif vol_file.split(".")[-1] == "pdb" or vol_file.split(".")[-1] == "cif":
@@ -137,7 +142,7 @@ class ClientQThread(QThread):
             self.volume.emit(generated_map)
             os.remove(vol_file.format(1))
         else:
-            for idx in range(self.z.shape[0]):
+            for idx in range(len(self.z)):
                 new_path = os.path.join(self.path, self.file_names[idx] + ".mrc")
                 formatted_vol_file = vol_file.format(idx + 1)
                 if formatted_vol_file.split(".")[-1] == "pdb" or formatted_vol_file.split(".")[-1] == "cif":
@@ -149,6 +154,6 @@ class ClientQThread(QThread):
                     os.remove(formatted_vol_file)
 
         # Emit signals
-        if self.z.shape[0] > 1:
+        if len(self.z) > 1:
             self.chimera.emit()
         self.finished.emit()
