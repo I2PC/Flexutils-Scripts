@@ -458,6 +458,10 @@ class Annotate3D(object):
                             "projectPath": self.class_inputs["projectPath"],
                             "csGPU": useGPU,
                             "outdir": self.path}
+            elif self.mode == "FromFiles":
+                with open(self.class_inputs["volumesPaths"], 'r') as f:
+                    self.volumesPaths = f.read().splitlines()
+                metadata = {"outdir": self.path, }
 
             if metadata is not None:
                 metadata_file = os.path.join(self.path, "metadata.p")
@@ -939,7 +943,14 @@ class Annotate3D(object):
                         show_warning(
                             "Previous conformation has not being generated yet, current selection will not be generated")
                     else:
-                        self.client.z = z_space
+                        if not self.mode == "FromFiles":
+                            self.client.z = z_space
+                        else:
+                            _, idz = self.kdtree_data.query(points, k=1)
+                            idz = np.array(idz).flatten()
+                            sel_names = ["vol_%03d" % (idx + 1) for idx in range(points.shape[0])]
+                            self.client.z = [self.volumesPaths[i] for i in idz]
+                            self.client.z_coords = self.z_space[idz]
                         self.client.file_names = sel_names
                         self.client.start()
 
@@ -1199,7 +1210,11 @@ class Annotate3D(object):
         if self.client.isRunning():
             show_warning("Previous conformation has not being generated yet, current selection will not be generated")
         else:
-            self.client.z = self.z_space[ind, :][None, ...]
+            if not self.mode == "FromFiles":
+                self.client.z = self.z_space[ind, :][None, ...]
+            else:
+                idz = [np.flatnonzero((vec == self.z_space).all(1))[0] for vec in self.z_space[ind, :][None, ...]]
+                self.client.z = [self.volumesPaths[i] for i in idz]
             self.client.file_names = [""]
             self.client.start()
 
@@ -1233,7 +1248,10 @@ class Annotate3D(object):
 
     def launchChimeraX(self):
         sel_names = self.client.file_names
-        z = self.client.z
+        if not self.mode == "FromFiles":
+            z = self.client.z
+        else:
+            z = self.client.z_coords
         self.createThreadChimeraX(z, sel_names, self.path)
         self.thread_chimerax.start()
 
@@ -1287,7 +1305,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', type=str, required=True)
     parser.add_argument('--z_space', type=str, required=True)
-    parser.add_argument('--interp_val', type=str, required=True)
     parser.add_argument('--path', type=str, required=False)
     parser.add_argument('--mode', type=str, required=False)
     parser.add_argument('--onlyView', action='store_true')
@@ -1309,14 +1326,12 @@ def main():
     # Read and generate data
     data = np.loadtxt(args.data)
     z_space = np.loadtxt(args.z_space)
-    # interp_val = np.loadtxt(args.interp_val)
 
     # Input
     input_dict = vars(args)
     input_dict['data'] = data
     input_dict['z_space'] = z_space
     input_dict['interactive'] = not args.onlyView
-    # input_dict['interp_val'] = interp_val
 
     # Initialize volume slicer
     Annotate3D(**input_dict)

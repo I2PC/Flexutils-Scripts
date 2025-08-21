@@ -223,12 +223,20 @@ class Server:
         elif self.mode == "3DFlex":
             self.outPath = os.path.join(self.metadata["outdir"], "decoded_map_class_{:02d}.mrc")
 
+        elif self.mode == "FromFiles":
+            self.outPath = os.path.join(self.metadata["outdir"], "decoded_map_class_{:02d}.mrc")
+
     def generateMap(self, raw_msglen):
         msglen = struct.unpack('>I', raw_msglen)[0]
         z_file = self.recMsg(msglen)
         z_file = pickle.loads(z_file)
-        z = np.loadtxt(z_file)
-        z = z[None, ...] if z.ndim == 1 else z
+
+        if not self.mode == "FromFiles":
+            z = np.loadtxt(z_file)
+            z = z[None, ...] if z.ndim == 1 else z
+        else:
+            with open(z_file, 'r') as f:
+                volumesPaths = f.read().splitlines()
 
         if self.mode == "Zernike3D":
             from flexutils_scripts import utils as utl
@@ -309,6 +317,12 @@ class Server:
                                            flexGeneratorJob + "_series_000",
                                            flexGeneratorJob + "_series_000_frame_{:03d}.mrc".format(idx))
                 shutil.copyfile(volume_path, self.outPath.format(idx + 1))
+
+        elif self.mode == "FromFiles":
+            idx = 0
+            for f in volumesPaths:
+                shutil.copyfile(f, self.outPath.format(idx + 1))
+                idx += 1
 
         self.client_socket.sendall("Map generated".encode())
 
