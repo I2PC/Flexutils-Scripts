@@ -450,6 +450,12 @@ class Annotate3D(object):
                             "config": self.class_inputs["config"], "outdir": self.path,
                             "boxsize": self.class_inputs["boxsize"],
                             "apix": self.class_inputs["sr"]}
+            elif self.mode == "Opus-DSD":
+                metadata = {"weights": self.class_inputs["weights"],
+                            "config": self.class_inputs["config"], "outdir": self.path,
+                            "boxsize": self.class_inputs["boxsize"],
+                            "apix": self.class_inputs["sr"],
+                            "zDim": self.class_inputs["zDim"], "downFrac": self.class_inputs["downFrac"]}
             elif self.mode == "3DFlex":
                 useGPU = 0 if useGPU == "" else useGPU
                 metadata = {"projectId": self.class_inputs["projectId"],

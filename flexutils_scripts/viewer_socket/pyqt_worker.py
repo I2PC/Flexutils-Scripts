@@ -68,6 +68,11 @@ class GenerateVolumesWorker(QObject):
             from cryodrgn.utils import generateVolumes
             cryodrgn.Plugin._defineVariables()
             fn = generateVolumes
+        elif self.mode == "Opus-DSD":
+            import opusdsd
+            from opusdsd.utils import generateVolumes
+            opusdsd.Plugin._defineVariables()
+            fn = generateVolumes
         elif self.mode == "HetSIREN":
             from flexutils.utils import generateVolumesHetSIREN
             fn = generateVolumesHetSIREN
@@ -85,6 +90,9 @@ class GenerateVolumesWorker(QObject):
         elif self.mode == "CryoDrgn":
             path = self.kwargs.get("outdir")
             generated_map = self.readMap(os.path.join(path, "vol_000.mrc"))
+        elif self.mode == "Opus-DSD":
+            path = self.kwargs.get("outdir")
+            generated_map = self.readMap(os.path.join(path, "vol_0.mrc"))
         elif self.mode == "HetSIREN":
             path = self.kwargs.get("outdir")
             generated_map = self.readMap(os.path.join(path, "decoded_map_class_01.mrc"))
