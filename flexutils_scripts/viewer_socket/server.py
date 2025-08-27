@@ -119,6 +119,7 @@ class Server:
             import torch
             from cryodrgn.models import HetOnlyVAE
             from cryodrgn import config
+            import types
             self.outPath = os.path.join(self.metadata["outdir"], "vol_{:03d}.mrc")
             use_cuda = torch.cuda.is_available()
             device = torch.device("cuda" if use_cuda else "cpu")
@@ -146,6 +147,94 @@ class Server:
             cfg = config.overwrite_config(self.metadata["config"], args)
             self.norm = [float(x) for x in cfg["dataset_args"]["norm"]]
             self.model, self.lattice = HetOnlyVAE.load(cfg, self.metadata["weights"], device=device)
+            self.model.eval()
+
+        elif self.mode == "Opus-DSD":
+            import torch
+            import torch.nn as nn
+            from cryodrgn.models import HetOnlyVAE, utils, lattice
+            from cryodrgn import config, dataset
+            import types
+            self.outPath = os.path.join(self.metadata["outdir"], "vol_{:03d}.mrc")
+            use_cuda = torch.cuda.is_available()
+            device = torch.device("cuda" if use_cuda else "cpu")
+            args = types.SimpleNamespace()
+            args.norm = None
+            args.downfrac = None
+            args.l_extent = None
+            args.qlayers = None
+            args.qdim = None
+            args.players = None
+            args.pdim = None
+            args.zdim = None
+            args.enc_mask = -1
+            args.encode_mode = 'grad'
+            args.domain = None
+            args.activation = "relu"
+            args.Apix = self.metadata["apix"]
+            args.pe_type = "vanilla"
+            args.pe_dim = None
+            args.mask_params = None
+            args.num_struct = None
+            args.template_type = 'conv'
+            args.templateres = None
+            args.num_bodies = 0
+            cfg = config.overwrite_config(self.metadata["config"], args)
+            weights = self.metadata["weights"]
+
+            D = cfg['lattice_args']['D']
+            in_dim = D ** 2
+            self.zdim = cfg['model_args']['zdim']
+
+            if "z_affine_dim" in cfg['model_args']:
+                z_affine_dim = cfg['model_args']['z_affine_dim']
+            else:
+                z_affine_dim = 4
+
+            self.norm = [float(x) for x in cfg["dataset_args"]["norm"]]
+            self.lattice = lattice.Lattice(D, extent=0.5)
+            downfrac = cfg['dataset_args']['downfrac']
+            crop_vol_size = cfg['model_args']['down_vol_size']
+            templateres = cfg['model_args']['templateres']
+            window_r = crop_vol_size / ((D - 1) * downfrac)
+
+            activation = {"relu": nn.ReLU, "leaky_relu": nn.LeakyReLU}[args.activation]
+            self.model = HetOnlyVAE(self.lattice, args.qlayers, args.qdim, args.players, args.pdim,
+                               in_dim, self.zdim, encode_mode=args.encode_mode, enc_mask=args.enc_mask,
+                               enc_type=args.pe_type, enc_dim=args.pe_dim, domain=args.domain,
+                               activation=activation, ref_vol=None, Apix=args.Apix,
+                               template_type=args.template_type,
+                               num_struct=args.num_struct,
+                               device=device, ctf_grid=None, downfrac=downfrac,
+                               templateres=templateres, window_r=window_r, masks_params=args.mask_params,
+                               num_bodies=args.num_bodies, z_affine_dim=z_affine_dim)
+
+            checkpoint = torch.load(weights)
+            pretrained_dict = checkpoint['model_state_dict']
+            model_dict = self.model.state_dict()
+            pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+            model_dict.update(pretrained_dict)
+            self.model.load_state_dict(model_dict)
+
+            if args.pe_type == 'vanilla':
+                pretrained_dict = checkpoint['encoder_state_dict']
+                model_dict = self.model.encoder.state_dict()
+                pretrained_dict = {k: v for k, v in pretrained_dict.items() if
+                                   k in model_dict and "grid" not in k and "mask" not in k}
+                model_dict.update(pretrained_dict)
+                pretrained_dict = checkpoint['decoder_state_dict']
+                if "ref_mask" in pretrained_dict:
+                    self.model.decoder.ref_mask = pretrained_dict["ref_mask"]
+                model_dict = self.model.decoder.state_dict()
+                for k in list(pretrained_dict.keys()):
+                    if k not in model_dict or pretrained_dict[k].shape != model_dict[k].shape:
+                        if k in model_dict:
+                            print(k, pretrained_dict[k].shape, model_dict[k].shape)
+                        del pretrained_dict[k]
+                model_dict.update(pretrained_dict)
+                self.model.decoder.load_state_dict(model_dict)
+
+            self.model = self.model.to(device)
             self.model.eval()
 
         elif self.mode == "HetSIREN":
@@ -276,6 +365,15 @@ class Server:
                     self.outPath.format(idx), np.array(vol).astype(np.float32)
                 )
                 idx += 1
+
+        elif self.mode == "Opus-DSD":
+            import torch
+            use_cuda = torch.cuda.is_available()
+            device = torch.device("cuda" if use_cuda else "cpu")
+            z = torch.tensor(z).float().to(device)
+            filename = self.outPath.replace('.mrc', '')
+            for idx, zz in enumerate(z):
+                self.model.save_mrc(filename.format(idx + 1), enc=zz, Apix=self.metadata["apix"])
 
         elif self.mode == "HetSIREN":
             from xmipp_metadata.image_handler import ImageHandler
