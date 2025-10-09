@@ -455,6 +455,8 @@ class Annotate3D(object):
                             "config": self.class_inputs["config"], "outdir": self.path,
                             "boxsize": self.class_inputs["boxsize"],
                             "apix": self.class_inputs["sr"],
+                            "crop_vol_size": self.class_inputs["crop_vol_size"],
+                            "wr": self.class_inputs["wr"],
                             "zDim": self.class_inputs["zDim"], "downFrac": self.class_inputs["downFrac"]}
             elif self.mode == "3DFlex":
                 useGPU = 0 if useGPU == "" else useGPU
